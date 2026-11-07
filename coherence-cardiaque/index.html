@@ -400,9 +400,9 @@ function makeImpulse(seconds) {
 function audioInit() {
   if (AC) return;
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; return; }
-  const out = AC.createDynamicsCompressor(); out.threshold.value = -18; out.ratio.value = 3; out.connect(AC.destination);
+  const out = AC.createDynamicsCompressor(); out.threshold.value = -8; out.knee.value = 12; out.ratio.value = 2; out.attack.value = 0.05; out.release.value = 1; out.connect(AC.destination);
   const master = AC.createGain(); master.gain.value = 0; master.connect(out);
-  const verb = AC.createConvolver(); verb.buffer = makeImpulse(5.5);
+  const verb = AC.createConvolver(); verb.buffer = makeImpulse(3.8);
   const wet = AC.createGain(); wet.gain.value = 0.75; verb.connect(wet).connect(master);
   // bourdon
   const music = AC.createGain(); music.gain.value = 0; music.connect(master); music.connect(verb);
@@ -426,18 +426,28 @@ function audioInit() {
   const g2 = AC.createGain(); g2.gain.value = 0; src2.connect(f2).connect(g2).connect(nature); src2.start(0, 2.3);
   // gouttes, pour le lotus
   const bowls = AC.createGain(); bowls.gain.value = 0.9; bowls.connect(master); bowls.connect(verb);
-  A = { master, verb, music, droneG, droneF, notes, nature, f1, g1, f2, g2, bowls, nextNote: 0, nextDrop: 0, prevB: 0 };
+  A = { nextFrame: 0, master, verb, music, droneG, droneF, notes, nature, f1, g1, f2, g2, bowls, nextNote: 0, nextDrop: 0, prevB: 0 };
+}
+/* Chaque réglage n'a jamais qu'une seule consigne en attente : on efface la précédente avant d'en poser une nouvelle.
+   (Empiler des consignes à chaque image saturait le moteur audio : micro-coupures puis silence.) */
+function glide(param, value, tc) {
+  const t = AC.currentTime;
+  if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(t); else { const v = param.value; param.cancelScheduledValues(t); param.setValueAtTime(v, t); }
+  param.setTargetAtTime(value, t, tc);
+}
+function audioAlive() {
+  if (AC && (AC.state === "suspended" || AC.state === "interrupted")) { try { AC.resume(); } catch (e) {} }
 }
 function audioStart() {
   if (!AC) return;
   if (AC.state === "suspended") AC.resume();
   const t = AC.currentTime;
-  A.master.gain.cancelScheduledValues(t); A.master.gain.setTargetAtTime(0.9, t, 1.2);
-  A.music.gain.setTargetAtTime(S.music ? 1 : 0, t, 1.5);
-  A.nature.gain.setTargetAtTime(S.nature ? 1 : 0, t, 1.5);
+  glide(A.master.gain, 0.9, 1.2);
+  glide(A.music.gain, S.music ? 1 : 0, 1.5);
+  glide(A.nature.gain, S.nature ? 1 : 0, 1.5);
   A.nextNote = t + 1.5;
 }
-function audioStop() { if (AC && A) { const t = AC.currentTime; A.master.gain.cancelScheduledValues(t); A.master.gain.setTargetAtTime(0, t, 0.8); } }
+function audioStop() { if (AC && A) glide(A.master.gain, 0, 0.8); }
 
 // une note de handpan / bol tibétain doux : fondamentale + partiels inharmoniques, attaque feutrée, longue résonance
 function zenNote(f, vol, when) {
@@ -479,9 +489,10 @@ function bird() {
 function audioPhase(inhale, dur) {
   if (!AC || !A) return;
   const t = AC.currentTime;
-  A.music.gain.setTargetAtTime(S.music ? 1 : 0, t, 0.5);
-  A.nature.gain.setTargetAtTime(S.nature ? 1 : 0, t, 0.5);
-  A.droneF.frequency.setTargetAtTime(inhale ? 650 : 380, t, dur / 3);
+  audioAlive();
+  glide(A.music.gain, S.music ? 1 : 0, 0.5);
+  glide(A.nature.gain, S.nature ? 1 : 0, 0.5);
+  glide(A.droneF.frequency, inhale ? 650 : 380, dur / 3);
   if (S.music) {
     const pool = inhale ? PENTA.slice(4) : PENTA.slice(0, 6);
     zenNote(pool[Math.floor(Math.random() * pool.length)], 0.11);
@@ -492,30 +503,35 @@ function audioPhase(inhale, dur) {
 // appelée à chaque image : la nature suit la courbe du souffle (b de 0 à 1)
 function audioFrame(b, inhale) {
   if (!AC || !A || !S.nature) return;
-  const t = AC.currentTime, k = 0.08;
+  const t = AC.currentTime;
+  if (t < A.nextFrame) return;
+  A.nextFrame = t + 0.1;
+  const k = 0.12, v = {};
   if (curScene === "maree") {
     // la vague roule et gronde quand elle monte, l'écume pétille quand elle redescend
-    A.f1.frequency.setTargetAtTime(250 + 1100 * b, t, k);
-    A.g1.gain.setTargetAtTime(0.06 + 0.32 * b, t, k);
-    A.f2.frequency.setTargetAtTime(3800, t, k); A.f2.Q.setTargetAtTime(0.5, t, k);
-    A.g2.gain.setTargetAtTime(inhale ? 0.015 + 0.02 * b : 0.02 + 0.07 * b, t, k);
+    v.f1_frequency = 250 + 1100 * b;
+    v.g1_gain = 0.06 + 0.32 * b;
+    v.f2_frequency = 3800; v.f2_Q = 0.5;
+    v.g2_gain = inhale ? 0.015 + 0.02 * b : 0.02 + 0.07 * b;
   } else if (curScene === "aube") {
-    A.f1.frequency.setTargetAtTime(180 + 300 * b, t, k); A.g1.gain.setTargetAtTime(0.03 + 0.05 * b, t, k);
-    A.f2.frequency.setTargetAtTime(500 + 500 * b, t, k); A.f2.Q.setTargetAtTime(1.6, t, k);
-    A.g2.gain.setTargetAtTime(0.02 + 0.06 * b, t, k);
+    v.f1_frequency = 180 + 300 * b; v.g1_gain = 0.03 + 0.05 * b;
+    v.f2_frequency = 500 + 500 * b; v.f2_Q = 1.6;
+    v.g2_gain = 0.02 + 0.06 * b;
   } else if (curScene === "lotus") {
-    A.f1.frequency.setTargetAtTime(300 + 200 * b, t, k); A.g1.gain.setTargetAtTime(0.05, t, k);
-    A.f2.frequency.setTargetAtTime(1400, t, k); A.f2.Q.setTargetAtTime(1, t, k); A.g2.gain.setTargetAtTime(0.008 + 0.012 * b, t, k);
+    v.f1_frequency = 300 + 200 * b; v.g1_gain = 0.05;
+    v.f2_frequency = 1400; v.f2_Q = 1; v.g2_gain = 0.008 + 0.012 * b;
     if (t > A.nextDrop) { drop(); A.nextDrop = t + 1.5 + Math.random() * 4; }
   } else if (curScene === "papillon") {
-    A.f1.frequency.setTargetAtTime(200 + 250 * b, t, k); A.g1.gain.setTargetAtTime(0.02 + 0.04 * b, t, k);
-    A.f2.frequency.setTargetAtTime(1800 + 800 * b, t, k); A.f2.Q.setTargetAtTime(0.8, t, k); A.g2.gain.setTargetAtTime(0.006 + 0.014 * b, t, k);
+    v.f1_frequency = 200 + 250 * b; v.g1_gain = 0.02 + 0.04 * b;
+    v.f2_frequency = 1800 + 800 * b; v.f2_Q = 0.8; v.g2_gain = 0.006 + 0.014 * b;
     if (t > A.nextDrop) { bird(); A.nextDrop = t + 3 + Math.random() * 6; }
   } else {
-    A.f1.frequency.setTargetAtTime(150 + 150 * b, t, k); A.g1.gain.setTargetAtTime(0.025 + 0.03 * b, t, k);
-    A.f2.frequency.setTargetAtTime(900 + 900 * b, t, k); A.f2.Q.setTargetAtTime(2.5, t, k);
-    A.g2.gain.setTargetAtTime(0.012 + 0.05 * b, t, k);
+    v.f1_frequency = 150 + 150 * b; v.g1_gain = 0.025 + 0.03 * b;
+    v.f2_frequency = 900 + 900 * b; v.f2_Q = 2.5;
+    v.g2_gain = 0.012 + 0.05 * b;
   }
+  const P = { f1_frequency: A.f1.frequency, f2_frequency: A.f2.frequency, f2_Q: A.f2.Q, g1_gain: A.g1.gain, g2_gain: A.g2.gain };
+  for (const key in v) glide(P[key], v[key], k);
 }
 function say(text) {
   if (!S.voice || !("speechSynthesis" in window)) return;
@@ -876,7 +892,7 @@ document.addEventListener("keydown", e => {
   if (e.code === "Space" && (mode === "run" || mode === "intro")) { e.preventDefault(); togglePause(); }
   if (e.key === "Escape" && (mode === "run" || mode === "intro")) stopSession(false);
 });
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && (mode === "run" || mode === "intro") && !wake) keepAwake(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && (mode === "run" || mode === "intro") && !paused) audioAlive(); if (document.visibilityState === "visible" && (mode === "run" || mode === "intro") && !wake) keepAwake(); });
 
 const fmtClock = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 

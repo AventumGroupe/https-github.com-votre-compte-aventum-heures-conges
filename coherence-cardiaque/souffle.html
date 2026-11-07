@@ -46,7 +46,7 @@ canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: bl
 .brand p { margin: 0; color: var(--muted); font-size: .95rem; }
 .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 0 0 8px; }
 
-.scenes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.scenes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .scene-btn {
   appearance: none; border: 1px solid var(--line); border-radius: 14px; padding: 0; cursor: pointer;
   background: transparent; color: var(--text); font: inherit; overflow: hidden; display: grid;
@@ -59,6 +59,7 @@ canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: bl
 .sw-maree { background: linear-gradient(#2a4469 0%, #c99a9b 38%, #f6c08f 42%, #3d7690 43%, #4f93a4 70%, #e9d2ac 72%, #d1ad80 100%); }
 .sw-aube  { background: radial-gradient(circle at 50% 62%, #fff1c9 0 9%, transparent 10%), linear-gradient(#3e6aa3, #f7b98a 60%, #6b4d6e 61%, #3a2b4a); }
 .sw-lotus { background: radial-gradient(ellipse at 50% 55%, #ffd6e4 0 14%, #e77fa4 15% 22%, transparent 23%), radial-gradient(circle at 50% 50%, #1d5a5e, #0b2a33 70%); }
+.sw-papillon{ background: radial-gradient(ellipse at 34% 46%, #7fd2ff 0 14%, #2f6fe0 15% 24%, transparent 25%), radial-gradient(ellipse at 66% 46%, #7fd2ff 0 14%, #2f6fe0 15% 24%, transparent 25%), linear-gradient(#f3d9b0, #e7c38e 60%, #8fae66); }
 .sw-aurore{ background: linear-gradient(170deg, transparent 30%, rgba(92,255,176,.65) 45%, transparent 60%), linear-gradient(#040915, #10303d 70%, #050b14 71%); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -172,7 +173,9 @@ details[open] summary::after { content: "–"; }
         <button class="scene-btn" id="sc-aube" data-scene="aube" aria-pressed="false"><i class="sw sw-aube"></i><span>Aube</span></button>
         <button class="scene-btn" id="sc-lotus" data-scene="lotus" aria-pressed="false"><i class="sw sw-lotus"></i><span>Lotus</span></button>
         <button class="scene-btn" id="sc-aurore" data-scene="aurore" aria-pressed="false"><i class="sw sw-aurore"></i><span>Aurore</span></button>
+        <button class="scene-btn" id="sc-papillon" data-scene="papillon" aria-pressed="false"><i class="sw sw-papillon"></i><span>Papillon</span></button>
       </div>
+      <div class="chips" style="margin-top:10px"><button class="chip" id="t-voyage" aria-pressed="true">Changer de paysage chaque minute</button></div>
       <p class="rate" id="scene-hint">La vague monte sur la plage à l'inspiration, se retire à l'expiration.</p>
     </div>
 
@@ -280,11 +283,13 @@ details[open] summary::after { content: "–"; }
 (() => {
 "use strict";
 const $ = (id) => document.getElementById(id);
-const canvas = $("scene"), ctx = canvas.getContext("2d");
+const canvas = $("scene"), mainCtx = canvas.getContext("2d");
+let ctx = mainCtx;
+const buf = document.createElement("canvas"), bufCtx = buf.getContext("2d");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ================= Réglages ================= */
-const S = { scene: "maree", inh: 5, exh: 5, minutes: 5, music: true, nature: true, bell: false, voice: false, vibe: false, text: true };
+const S = { scene: "maree", inh: 5, exh: 5, minutes: 5, music: true, nature: true, voyage: true, bell: false, voice: false, vibe: false, text: true };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -295,19 +300,21 @@ const SUBS = {
   maree: ["la marée monte", "la marée descend"],
   aube: ["le soleil se lève", "le soleil se couche"],
   lotus: ["le lotus s'ouvre", "le lotus se referme"],
-  aurore: ["l'aurore s'élève", "l'aurore s'apaise"]
+  aurore: ["l'aurore s'élève", "l'aurore s'apaise"],
+  papillon: ["le papillon ouvre ses ailes", "il les referme"]
 };
 const HINTS = {
   maree: "La marée monte à l'inspiration : l'eau gagne la plage et grimpe le long du ponton. Elle descend à l'expiration.",
   aube: "Le soleil se lève à l'inspiration, redescend doucement à l'expiration.",
   lotus: "Le lotus s'ouvre à l'inspiration, se referme à l'expiration.",
-  aurore: "L'aurore boréale s'élève à l'inspiration, s'apaise à l'expiration."
+  aurore: "L'aurore boréale s'élève à l'inspiration, s'apaise à l'expiration.",
+  papillon: "Le papillon ouvre ses ailes à l'inspiration, les referme à l'expiration."
 };
 
 function press(groupSel, btn) { document.querySelectorAll(groupSel).forEach(b => b.setAttribute("aria-pressed", String(b === btn))); }
 function syncUI() {
   document.querySelectorAll(".scene-btn").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.scene === S.scene)));
-  $("scene-hint").textContent = HINTS[S.scene];
+  $("scene-hint").textContent = HINTS[S.scene] + (S.voyage ? " Puis les paysages se succèdent, un par minute." : "");
   let matched = null;
   document.querySelectorAll("#presets .chip").forEach(b => { if (!b.dataset.custom && +b.dataset.in === S.inh && +b.dataset.out === S.exh && !S.custom) matched = b; });
   press("#presets .chip", matched || $("pr-custom"));
@@ -322,7 +329,7 @@ function syncUI() {
 }
 const fmtS = (v) => `${String(v).replace(".", ",")} s`;
 
-document.querySelectorAll(".scene-btn").forEach(b => b.addEventListener("click", () => { S.scene = b.dataset.scene; syncUI(); }));
+document.querySelectorAll(".scene-btn").forEach(b => b.addEventListener("click", () => { S.scene = b.dataset.scene; setScene(S.scene); syncUI(); }));
 document.querySelectorAll("#presets .chip").forEach(b => b.addEventListener("click", () => {
   if (b.dataset.custom) { S.custom = true; } else { S.custom = false; S.inh = +b.dataset.in; S.exh = +b.dataset.out; }
   syncUI();
@@ -451,6 +458,15 @@ function drop() {
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
   o.connect(g).connect(A.bowls); o.start(t); o.stop(t + 0.2);
 }
+function bird() {
+  const t0 = AC.currentTime, n = 2 + Math.floor(Math.random() * 3), base = 2400 + Math.random() * 1600;
+  for (let i = 0; i < n; i++) {
+    const t = t0 + i * (0.13 + Math.random() * 0.05), o = AC.createOscillator(), g = AC.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(base, t); o.frequency.exponentialRampToValueAtTime(base * (1.25 + Math.random() * 0.3), t + 0.07);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.018, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+    o.connect(g).connect(A.bowls); o.start(t); o.stop(t + 0.12);
+  }
+}
 // début de phase : une note qui monte à l'inspiration, qui descend à l'expiration
 function audioPhase(inhale, dur) {
   if (!AC || !A) return;
@@ -469,20 +485,24 @@ function audioPhase(inhale, dur) {
 function audioFrame(b, inhale) {
   if (!AC || !A || !S.nature) return;
   const t = AC.currentTime, k = 0.08;
-  if (S.scene === "maree") {
+  if (curScene === "maree") {
     // la vague roule et gronde quand elle monte, l'écume pétille quand elle redescend
     A.f1.frequency.setTargetAtTime(250 + 1100 * b, t, k);
     A.g1.gain.setTargetAtTime(0.06 + 0.32 * b, t, k);
     A.f2.frequency.setTargetAtTime(3800, t, k); A.f2.Q.setTargetAtTime(0.5, t, k);
     A.g2.gain.setTargetAtTime(inhale ? 0.015 + 0.02 * b : 0.02 + 0.07 * b, t, k);
-  } else if (S.scene === "aube") {
+  } else if (curScene === "aube") {
     A.f1.frequency.setTargetAtTime(180 + 300 * b, t, k); A.g1.gain.setTargetAtTime(0.03 + 0.05 * b, t, k);
     A.f2.frequency.setTargetAtTime(500 + 500 * b, t, k); A.f2.Q.setTargetAtTime(1.6, t, k);
     A.g2.gain.setTargetAtTime(0.02 + 0.06 * b, t, k);
-  } else if (S.scene === "lotus") {
+  } else if (curScene === "lotus") {
     A.f1.frequency.setTargetAtTime(300 + 200 * b, t, k); A.g1.gain.setTargetAtTime(0.05, t, k);
     A.f2.frequency.setTargetAtTime(1400, t, k); A.f2.Q.setTargetAtTime(1, t, k); A.g2.gain.setTargetAtTime(0.008 + 0.012 * b, t, k);
     if (t > A.nextDrop) { drop(); A.nextDrop = t + 1.5 + Math.random() * 4; }
+  } else if (curScene === "papillon") {
+    A.f1.frequency.setTargetAtTime(200 + 250 * b, t, k); A.g1.gain.setTargetAtTime(0.02 + 0.04 * b, t, k);
+    A.f2.frequency.setTargetAtTime(1800 + 800 * b, t, k); A.f2.Q.setTargetAtTime(0.8, t, k); A.g2.gain.setTargetAtTime(0.006 + 0.014 * b, t, k);
+    if (t > A.nextDrop) { bird(); A.nextDrop = t + 3 + Math.random() * 6; }
   } else {
     A.f1.frequency.setTargetAtTime(150 + 150 * b, t, k); A.g1.gain.setTargetAtTime(0.025 + 0.03 * b, t, k);
     A.f2.frequency.setTargetAtTime(900 + 900 * b, t, k); A.f2.Q.setTargetAtTime(2.5, t, k);
@@ -524,8 +544,10 @@ function buildSeeds() {
   for (let x = -10; x < W + 10; x += 7 + r() * 9) pines.push({ x, h: H * (0.04 + r() * 0.07), w: 6 + r() * 6 });
   const motes = Array.from({ length: 46 }, () => ({ x: r(), y: r(), s: 0.6 + r() * 1.8, sp: 0.2 + r() * 0.6, p: r() * 6.28 }));
   const piles = [[0.27, 0.635, 0.42], [0.31, 0.67, 0.52], [0.355, 0.715, 0.64], [0.41, 0.77, 0.78], [0.475, 0.835, 0.95], [0.55, 0.91, 1.15]];
+  const bokeh = Array.from({ length: 14 }, () => ({ x: r(), y: r() * 0.7, r: 0.03 + r() * 0.07, sp: 0.3 + r(), p: r() * 6.28 }));
+  const grass = Array.from({ length: Math.round(W / 6) }, () => ({ x: r(), h: 0.08 + r() * 0.22, w: 1 + r() * 2.2, p: r() * 6.28, c: ["#5f8c46", "#77a052", "#4a7339", "#93b25e"][Math.floor(r() * 4)] }));
   const pads = [{ x: 0.2, y: 0.83, r: 0.09 }, { x: 0.8, y: 0.78, r: 0.07 }, { x: 0.66, y: 0.92, r: 0.11 }, { x: 0.33, y: 0.95, r: 0.06 }];
-  seedData = { piles, stars, aube, aubeHy, aurM, aurHy, pines, motes, pads };
+  seedData = { bokeh, grass, piles, stars, aube, aubeHy, aurM, aurHy, pines, motes, pads };
 }
 
 const hex = (h) => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
@@ -680,20 +702,76 @@ function drawLotus(b, t) {
   ctx.globalAlpha = 1;
 }
 
+/* ---------- Papillon ---------- */
+function wing(sx, fore, cols) {
+  // aile dessinée à plat puis écrasée horizontalement : sx = 1 ailes ouvertes, proche de 0 ailes fermées
+  ctx.save(); ctx.scale(sx, 1);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, fore ? 1.15 : 0.9);
+  g.addColorStop(0, cols[0]); g.addColorStop(0.55, cols[1]); g.addColorStop(0.85, cols[2]); g.addColorStop(1, "#1a1426");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0);
+  if (fore) { ctx.bezierCurveTo(0.35, -0.55, 0.95, -1.05, 1.15, -0.78); ctx.bezierCurveTo(1.3, -0.45, 0.85, -0.08, 0.05, 0.05); }
+  else { ctx.bezierCurveTo(0.6, 0.05, 1.0, 0.35, 0.82, 0.78); ctx.bezierCurveTo(0.62, 1.05, 0.2, 0.75, 0.02, 0.12); }
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,250,235,.9)";
+  (fore ? [[0.95, -0.82, 0.05], [1.05, -0.62, 0.04], [0.8, -0.9, 0.035]] : [[0.66, 0.72, 0.04], [0.5, 0.8, 0.03]]).forEach(([x, y, r]) => { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); });
+  ctx.restore();
+}
+function drawPapillon(b, t) {
+  const m = Math.min(W, H);
+  ctx.fillStyle = vGrad(0, H, [[0, "#f3d9b0"], [0.45, "#e8c48f"], [0.75, "#a9b874"], [1, "#55794a"]]); ctx.fillRect(0, 0, W, H);
+  // halo de lumière dorée
+  let g = ctx.createRadialGradient(W * 0.72, H * 0.18, 0, W * 0.72, H * 0.18, Math.max(W, H) * 0.7);
+  g.addColorStop(0, "rgba(255,244,214,.75)"); g.addColorStop(1, "rgba(255,244,214,0)"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // bokeh
+  seedData.bokeh.forEach(p => {
+    const x = (p.x * W + t * 0.004 * p.sp) % (W + 80) - 40, y = p.y * H + Math.sin(t * 0.0004 + p.p) * 10, r = p.r * m;
+    const gg = ctx.createRadialGradient(x, y, 0, x, y, r); gg.addColorStop(0, `rgba(255,250,230,${0.22 + 0.12 * b})`); gg.addColorStop(1, "rgba(255,250,230,0)");
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  });
+  // herbes
+  seedData.grass.forEach(gr => {
+    const sway = Math.sin(t * 0.0007 + gr.p) * gr.h * 0.08;
+    ctx.strokeStyle = gr.c; ctx.lineWidth = gr.w; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(gr.x * W, H + 4); ctx.quadraticCurveTo(gr.x * W + sway * 0.3, H - gr.h * H * 0.5, gr.x * W + sway, H - gr.h * H); ctx.stroke();
+  });
+  // tige et fleur
+  const fx = W * 0.5, fy = H * 0.6, sway = Math.sin(t * 0.0005) * m * 0.01;
+  ctx.strokeStyle = "#4f7a3c"; ctx.lineWidth = m * 0.012;
+  ctx.beginPath(); ctx.moveTo(fx - m * 0.03, H + 4); ctx.quadraticCurveTo(fx - m * 0.05, fy + H * 0.2, fx + sway, fy); ctx.stroke();
+  ctx.fillStyle = "#5c8a45"; ctx.beginPath(); ctx.ellipse(fx - m * 0.08, fy + H * 0.2, m * 0.07, m * 0.02, -0.5, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(fx + sway, fy);
+  for (let i = 0; i < 12; i++) { ctx.rotate(Math.PI / 6); ctx.fillStyle = i % 2 ? "#f6eef2" : "#efe0ea"; ctx.beginPath(); ctx.ellipse(0, -m * 0.045, m * 0.02, m * 0.045, 0, 0, 7); ctx.fill(); }
+  ctx.fillStyle = "#e7a93a"; ctx.beginPath(); ctx.arc(0, 0, m * 0.026, 0, 7); ctx.fill();
+  ctx.restore();
+  // papillon posé sur la fleur : les ailes s'ouvrent à l'inspiration
+  const S2 = m * 0.17, open = lerp(0.1, 1, b);
+  ctx.save(); ctx.translate(fx + sway, fy - m * 0.07);
+  ctx.scale(S2, S2);
+  const fc = ["#9fe7ff", "#2f7df6", "#1b3aa8"], hc = ["#bff0ff", "#3c8cf2", "#22328f"];
+  [-1, 1].forEach(side => { ctx.save(); ctx.scale(side, 1); wing(open, false, hc); wing(open, true, fc); ctx.restore(); });
+  ctx.fillStyle = "#231a26"; ctx.beginPath(); ctx.ellipse(0, 0.1, 0.05, 0.42, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, -0.34, 0.07, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#231a26"; ctx.lineWidth = 0.02;
+  [-1, 1].forEach(sd => { ctx.beginPath(); ctx.moveTo(0, -0.38); ctx.quadraticCurveTo(sd * 0.12, -0.65, sd * 0.22, -0.78); ctx.stroke(); ctx.beginPath(); ctx.arc(sd * 0.22, -0.78, 0.025, 0, 7); ctx.fill(); });
+  ctx.restore();
+}
+
 /* ---------- Aurore ---------- */
-let aurGrads = null;
+let aurGrads = new Map();
 function drawAurore(b, t) {
   const hy = seedData.aurHy;
   ctx.fillStyle = vGrad(0, hy, [[0, "#02060f"], [0.6, "#071a2a"], [1, "#0f3440"]]); ctx.fillRect(0, 0, W, H);
   drawStars(0.9 - 0.3 * b, t);
-  if (!aurGrads) {
-    aurGrads = [["rgba(130,90,255,0)", "rgba(110,255,190,0.55)", "rgba(90,255,170,0.9)"], ["rgba(255,90,200,0)", "rgba(120,220,255,0.45)", "rgba(80,255,200,0.8)"], ["rgba(90,255,170,0)", "rgba(170,255,140,0.4)", "rgba(200,255,170,0.7)"]]
+  let AG = aurGrads.get(ctx);
+  if (!AG) {
+    AG = [["rgba(130,90,255,0)", "rgba(110,255,190,0.55)", "rgba(90,255,170,0.9)"], ["rgba(255,90,200,0)", "rgba(120,220,255,0.45)", "rgba(80,255,200,0.8)"], ["rgba(90,255,170,0)", "rgba(170,255,140,0.4)", "rgba(200,255,170,0.7)"]]
       .map(c => { const g = ctx.createLinearGradient(0, 0, 0, 1); g.addColorStop(0, c[0]); g.addColorStop(0.7, c[1]); g.addColorStop(1, c[2]); return g; });
+    aurGrads.set(ctx, AG);
   }
   ctx.globalCompositeOperation = "lighter";
   const step = 3;
   for (let r = 0; r < 3; r++) {
-    ctx.fillStyle = aurGrads[r];
+    ctx.fillStyle = AG[r];
     const amp = 0.7 + 0.3 * b;
     for (let x = 0; x < W; x += step) {
       const base = H * (0.40 + r * 0.07) + Math.sin(x * 0.0035 + t * 0.00018 + r * 1.7) * H * 0.07 + Math.sin(x * 0.011 + t * 0.0003 + r) * H * 0.02;
@@ -717,7 +795,12 @@ function drawAurore(b, t) {
   seedData.pines.forEach(p => { const yb = hy + 2; ctx.beginPath(); ctx.moveTo(p.x - p.w, yb); ctx.lineTo(p.x, yb - p.h); ctx.lineTo(p.x + p.w, yb); ctx.fill(); });
 }
 
-const SCENES = { maree: drawMaree, aube: drawAube, lotus: drawLotus, aurore: drawAurore };
+const SCENES = { maree: drawMaree, aube: drawAube, lotus: drawLotus, aurore: drawAurore, papillon: drawPapillon };
+const ORDER = ["maree", "aube", "lotus", "aurore", "papillon"];
+/* alternance : un paysage par minute, avec un fondu de 3 secondes au début d'une inspiration */
+let curScene = S.scene, prevScene = null, fadeT = 1, lastSwitchMin = 0;
+const FADE = 3000;
+function setScene(name) { if (name === curScene) return; prevScene = curScene; curScene = name; fadeT = 0; }
 
 /* ================= Horloge du souffle ================= */
 const ease = (p) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, p)));
@@ -741,7 +824,7 @@ function start() {
   audioInit(); audioStart();
   const cyc = S.inh + S.exh;
   totalMs = Math.max(1, Math.round(S.minutes * 60 / cyc)) * cyc * 1000;
-  runMs = 0; introMs = 0; paused = false; lastPhase = null; mode = "intro";
+  runMs = 0; introMs = 0; paused = false; lastPhase = null; mode = "intro"; lastSwitchMin = 0; setScene(S.scene);
   show($("home"), false); show($("hud"), true); show($("end"), false);
   $("paused").hidden = true; setPauseIcon();
   $("word").textContent = "Installez-vous"; $("word").style.opacity = 1; $("count").textContent = "le dos droit, les épaules relâchées";
@@ -762,6 +845,7 @@ function stopSession(completed) {
     document.querySelectorAll("#feel .chip").forEach(c => c.setAttribute("aria-pressed", "false"));
     show($("end"), true); if (AC && S.bell) singingBowl(196, 0.14); say("Séance terminée. Revenez doucement.");
   } else { mode = "home"; show($("home"), true); }
+  setScene(S.scene);
 }
 function setPauseIcon() {
   $("pause").innerHTML = paused ? '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg>' : '<svg viewBox="0 0 16 16"><path d="M4 2h3v12H4zM9 2h3v12H9z"/></svg>';
@@ -805,11 +889,15 @@ function frame(now) {
       const ph = st.inhale ? "in" : "out";
       if (ph !== lastPhase) {
         lastPhase = ph;
+        const minute = Math.floor(runMs / 60000);
+        if (st.inhale && S.voyage && minute > lastSwitchMin && totalMs - runMs > 20000) {
+          lastSwitchMin = minute; setScene(ORDER[(ORDER.indexOf(curScene) + 1) % ORDER.length]);
+        }
         const dur = st.inhale ? S.inh : S.exh;
         audioPhase(st.inhale, dur); vibe(st.inhale);
         say(st.inhale ? "Inspirez" : "Expirez");
         $("word").textContent = st.inhale ? "Inspirez" : "Expirez";
-        $("count").dataset.sub = (SUBS[S.scene] || ["", ""])[st.inhale ? 0 : 1];
+        $("count").dataset.sub = (SUBS[curScene] || ["", ""])[st.inhale ? 0 : 1];
       }
       const left = Math.ceil(st.left);
       $("count").textContent = $("count").dataset.sub + "  " + "·".repeat(Math.max(1, left));
@@ -823,8 +911,17 @@ function frame(now) {
   // lissage léger pour éviter tout à-coup (pause, changement de scène)
   sceneB += (b - sceneB) * Math.min(1, dt / 60);
   const t = reduceMotion ? now * 0.4 : now;
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  SCENES[S.scene](sceneB, t);
+  fadeT = Math.min(1, fadeT + dt / FADE);
+  if (prevScene && fadeT < 1) {
+    if (buf.width !== canvas.width || buf.height !== canvas.height) { buf.width = canvas.width; buf.height = canvas.height; }
+    ctx = bufCtx; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); SCENES[prevScene](sceneB, t);
+    ctx = mainCtx; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); SCENES[curScene](sceneB, t);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1 - ease(fadeT); ctx.drawImage(buf, 0, 0); ctx.globalAlpha = 1;
+  } else {
+    prevScene = null;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    SCENES[curScene](sceneB, t);
+  }
   requestAnimationFrame(frame);
 }
 
@@ -832,7 +929,7 @@ function frame(now) {
 const hot = window.claude && window.claude.hot;
 if (hot && hot.snapshot) hot.snapshot(() => ({ S }));
 
-window.addEventListener("resize", () => { resize(); aurGrads = null; });
+window.addEventListener("resize", () => { resize(); aurGrads = new Map(); });
 resize(); syncUI(); renderDay();
 requestAnimationFrame((n) => { lastFrame = n; frame(n); });
 })();

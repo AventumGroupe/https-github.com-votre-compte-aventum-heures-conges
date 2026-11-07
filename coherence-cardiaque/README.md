@@ -11,6 +11,9 @@ Au lieu de la classique boule qui monte et descend, ce sont des **paysages vivan
 | Aube | le soleil se lève, le ciel s'éclaire | il redescend, les étoiles reviennent |
 | Lotus | la fleur s'ouvre, des lucioles s'élèvent | elle se referme doucement |
 | Aurore | l'aurore boréale s'élève et s'intensifie | elle s'apaise au-dessus du lac |
+| Papillon | il ouvre ses ailes, posé sur une fleur | il les referme |
+
+Option **Changer de paysage chaque minute** : les cinq paysages se succèdent pendant la séance, avec un fondu enchaîné au début d'une inspiration.
 
 ## Fonctionnalités
 

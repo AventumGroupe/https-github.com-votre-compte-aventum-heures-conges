@@ -7,7 +7,7 @@ Au lieu de la classique boule qui monte et descend, ce sont des **paysages vivan
 
 | Paysage | Inspiration | Expiration |
 |---|---|---|
-| Marée | la marée monte : l'eau gagne la plage et grimpe le long du ponton | la marée descend et découvre le sable |
+| Marée | la marée monte : l'eau gagne la plage | la marée descend et découvre le sable |
 | Aube | le soleil se lève, le ciel s'éclaire | il redescend, les étoiles reviennent |
 | Lotus | la fleur s'ouvre, des lucioles s'élèvent | elle se referme doucement |
 | Aurore | l'aurore boréale s'élève et s'intensifie | elle s'apaise au-dessus du lac |
@@ -23,6 +23,7 @@ Au lieu de la classique boule qui monte et descend, ce sont des **paysages vivan
   - Volume.
   - Consignes : image seule, mots à l'écran, ou mots et voix.
 - Son volontairement épuré : uniquement des sons purs (accord tenu qui enfle à l'inspiration, rares notes pentatoniques, bol chantant), sans bruit synthétique.
+- Rappels : jours de la semaine et heures du matin, du midi et du soir réglables ; ajout en un geste à Google Agenda (rendez-vous récurrent de 5 minutes avec alerte), ou fichier .ics pour Apple et Outlook quand l'application est ouverte hors artifact.
 - Suivi 365 : trois créneaux du jour (matin, midi, soir) et les 7 derniers jours, stockés localement dans le navigateur.
 - Ressenti en fin de séance, écran maintenu allumé pendant la séance, raccourcis clavier (Espace = pause, Échap = arrêter).
 

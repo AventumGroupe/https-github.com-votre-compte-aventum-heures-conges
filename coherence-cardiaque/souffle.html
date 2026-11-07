@@ -122,12 +122,16 @@ summary { cursor: pointer; font-size: .9rem; color: var(--text); list-style: non
 summary::-webkit-details-marker { display: none; }
 summary::after { content: "+"; color: var(--muted); }
 details[open] summary::after { content: "–"; }
-.about { color: var(--muted); font-size: .88rem; display: grid; gap: 8px; margin-top: 10px; }
-.about p { margin: 0; max-width: 62ch; }
-.about .rule { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; color: var(--text); }
-.about .rule div { border: 1px solid var(--line); border-radius: 12px; padding: 10px 4px; }
-.about .rule b { font-family: var(--display); font-weight: 400; font-size: 1.7rem; display: block; line-height: 1; }
-.about .rule small { font-size: .72rem; color: var(--muted); }
+.rem-body { display: grid; gap: 14px; margin-top: 12px; }
+summary span:last-child { margin-left: auto; margin-right: 10px; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.days { display: flex; justify-content: space-between; gap: 4px; }
+.days button { appearance: none; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); font: 500 .85rem var(--body); cursor: pointer; }
+.days button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.cal { display: grid; gap: 8px; }
+.cal-link { appearance: none; display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(244,236,222,.05); color: var(--text); font: inherit; font-size: .88rem; text-decoration: none; cursor: pointer; text-align: left; }
+.cal-link span:last-child { color: var(--accent); font-size: .82rem; }
+.cal-link:hover { background: rgba(244,236,222,.1); }
+.note { margin: 0; color: var(--muted); font-size: .8rem; }
 
 /* ---------- Séance ---------- */
 .hud { position: fixed; inset: 0; pointer-events: none; transition: opacity .8s ease; }
@@ -221,6 +225,32 @@ details[open] summary::after { content: "–"; }
       <div class="week" id="week" aria-label="Les 7 derniers jours"></div>
     </div>
 
+    <details class="reminders" id="rem">
+      <summary><span>Rappels</span><span id="rem-sum"></span></summary>
+      <div class="rem-body">
+        <div class="days" id="rem-days" role="group" aria-label="Jours des rappels">
+          <button data-d="1" aria-label="Lundi">L</button><button data-d="2" aria-label="Mardi">M</button><button data-d="3" aria-label="Mercredi">M</button><button data-d="4" aria-label="Jeudi">J</button><button data-d="5" aria-label="Vendredi">V</button><button data-d="6" aria-label="Samedi">S</button><button data-d="0" aria-label="Dimanche">D</button>
+        </div>
+        <div class="sliders">
+          <div class="sl">
+            <div class="sl-head"><label for="s-matin">Matin</label><output id="v-matin" for="s-matin"></output></div>
+            <input type="range" id="s-matin" min="345" max="600" step="15" value="420">
+          </div>
+          <div class="sl">
+            <div class="sl-head"><label for="s-midi">Midi</label><output id="v-midi" for="s-midi"></output></div>
+            <input type="range" id="s-midi" min="645" max="840" step="15" value="645">
+          </div>
+          <div class="sl">
+            <div class="sl-head"><label for="s-soir">Soir</label><output id="v-soir" for="s-soir"></output></div>
+            <input type="range" id="s-soir" min="1005" max="1320" step="15" value="1200">
+          </div>
+        </div>
+        <div class="cal" id="rem-links"></div>
+        <p class="note" id="rem-note">Chaque rappel s'ajoute à votre agenda comme un rendez-vous de 5 minutes qui se répète : c'est votre téléphone qui vous prévient.</p>
+      </div>
+    </details>
+
+
   </section>
 </main>
 
@@ -304,6 +334,75 @@ function syncUI() {
 }
 [["s-rythme", "rythme"], ["s-duree", "minutes"], ["s-son", "son"], ["s-vol", "vol"], ["s-guide", "guide"]].forEach(([id, k]) =>
   $(id).addEventListener("input", e => { S[k] = +e.target.value; syncUI(); if (k === "vol" || k === "son") audioLevel(); }));
+
+/* ================= Rappels =================
+   Une page web ne peut pas réveiller le téléphone à heure fixe : les rappels passent donc par l'agenda,
+   sous forme de rendez-vous récurrents de 5 minutes avec alerte. */
+const REM = Object.assign({ days: [1, 2, 3, 4, 5], matin: 420, midi: 645, soir: 1200 }, store.get("souffle.rappels", {}));
+const MOMENTS = [["matin", "Matin", 345], ["midi", "Midi", 645], ["soir", "Soir", 1005]]; // valeur la plus à gauche = désactivé
+const BYDAY = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"], DAYL = ["D", "L", "M", "M", "J", "V", "S"];
+const hhmm = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`;
+const framed = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+function nextStart(min) {
+  const d = new Date(); d.setSeconds(0, 0);
+  for (let i = 0; i < 8; i++) {
+    const c = new Date(d); c.setDate(d.getDate() + i); c.setHours(Math.floor(min / 60), min % 60, 0, 0);
+    if (REM.days.includes(c.getDay()) && c > d) return c;
+  }
+  return d;
+}
+const stamp = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}00`;
+function rrule() { return `RRULE:FREQ=WEEKLY;BYDAY=${[1, 2, 3, 4, 5, 6, 0].filter(d => REM.days.includes(d)).map(d => BYDAY[d]).join(",")}`; }
+function googleLink(label, min) {
+  const s = nextStart(min), e = new Date(s.getTime() + 5 * 60000);
+  const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || "Europe/Paris";
+  const q = new URLSearchParams({ action: "TEMPLATE", text: "Cohérence cardiaque", details: `Séance du ${label.toLowerCase()} : 6 respirations par minute pendant 5 minutes.`, dates: `${stamp(s)}/${stamp(e)}`, ctz: tz, recur: rrule() });
+  return "https://calendar.google.com/calendar/render?" + q.toString();
+}
+function icsFile(active) {
+  const now = stamp(new Date()).replace("T", "T") + "Z";
+  const ev = active.map(([k, label]) => {
+    const s = nextStart(REM[k]);
+    return ["BEGIN:VEVENT", `UID:coherence-${k}-${Date.now()}@coherence-cardiaque`, `DTSTAMP:${now}`, `DTSTART:${stamp(s)}`, "DURATION:PT5M", rrule(),
+      "SUMMARY:Cohérence cardiaque", `DESCRIPTION:Séance du ${label.toLowerCase()} : 6 respirations par minute pendant 5 minutes.`,
+      "BEGIN:VALARM", "TRIGGER:PT0M", "ACTION:DISPLAY", "DESCRIPTION:C'est l'heure de respirer", "END:VALARM", "END:VEVENT"].join("\r\n");
+  });
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Coherence cardiaque//FR", ...ev, "END:VCALENDAR"].join("\r\n");
+}
+function renderRem() {
+  document.querySelectorAll("#rem-days button").forEach(b => b.setAttribute("aria-pressed", String(REM.days.includes(+b.dataset.d))));
+  const active = MOMENTS.filter(([k, , off]) => REM[k] > off);
+  MOMENTS.forEach(([k, , off]) => {
+    $("s-" + k).value = REM[k]; paintRange($("s-" + k));
+    $("v-" + k).textContent = REM[k] > off ? hhmm(REM[k]) : "Pas de rappel";
+  });
+  const days = [1, 2, 3, 4, 5, 6, 0].filter(d => REM.days.includes(d));
+  const dTxt = days.length === 7 ? "Tous les jours" : days.join() === "1,2,3,4,5" ? "Lun – ven" : days.map(d => DAYL[d]).join(" ");
+  $("rem-sum").textContent = days.length && active.length ? `${dTxt} · ${active.map(([k]) => hhmm(REM[k])).join(" · ")}` : "Aucun";
+  const box = $("rem-links"); box.innerHTML = "";
+  if (!days.length || !active.length) { box.innerHTML = '<p class="note">Choisissez au moins un jour et un moment.</p>'; }
+  else {
+    active.forEach(([k, label]) => {
+      const a = document.createElement("a"); a.className = "cal-link"; a.href = googleLink(label, REM[k]); a.target = "_blank"; a.rel = "noopener";
+      a.innerHTML = `<span>${label} · ${hhmm(REM[k])}</span><span>Ajouter à Google Agenda ↗</span>`; box.appendChild(a);
+    });
+    if (!framed) {
+      const b = document.createElement("button"); b.className = "cal-link"; b.type = "button";
+      b.innerHTML = "<span>Apple, Outlook…</span><span>Télécharger le fichier agenda</span>";
+      b.addEventListener("click", () => {
+        const url = URL.createObjectURL(new Blob([icsFile(active)], { type: "text/calendar" }));
+        const a = document.createElement("a"); a.href = url; a.download = "coherence-cardiaque.ics"; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      });
+      box.appendChild(b);
+    }
+  }
+  store.set("souffle.rappels", REM);
+}
+document.querySelectorAll("#rem-days button").forEach(b => b.addEventListener("click", () => {
+  const d = +b.dataset.d; REM.days = REM.days.includes(d) ? REM.days.filter(x => x !== d) : [...REM.days, d]; renderRem();
+}));
+MOMENTS.forEach(([k]) => $("s-" + k).addEventListener("input", e => { REM[k] = +e.target.value; renderRem(); }));
 
 /* ================= Journal 365 ================= */
 const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -440,11 +539,10 @@ function buildSeeds() {
   const pines = [];
   for (let x = -10; x < W + 10; x += 7 + r() * 9) pines.push({ x, h: H * (0.04 + r() * 0.07), w: 6 + r() * 6 });
   const motes = Array.from({ length: 46 }, () => ({ x: r(), y: r(), s: 0.6 + r() * 1.8, sp: 0.2 + r() * 0.6, p: r() * 6.28 }));
-  const piles = [[0.27, 0.635, 0.42], [0.31, 0.67, 0.52], [0.355, 0.715, 0.64], [0.41, 0.77, 0.78], [0.475, 0.835, 0.95], [0.55, 0.91, 1.15]];
   const bokeh = Array.from({ length: 14 }, () => ({ x: r(), y: r() * 0.7, r: 0.03 + r() * 0.07, sp: 0.3 + r(), p: r() * 6.28 }));
   const grass = Array.from({ length: Math.round(W / 6) }, () => ({ x: r(), h: 0.08 + r() * 0.22, w: 1 + r() * 2.2, p: r() * 6.28, c: ["#5f8c46", "#77a052", "#4a7339", "#93b25e"][Math.floor(r() * 4)] }));
   const pads = [{ x: 0.2, y: 0.83, r: 0.09 }, { x: 0.8, y: 0.78, r: 0.07 }, { x: 0.66, y: 0.92, r: 0.11 }, { x: 0.33, y: 0.95, r: 0.06 }];
-  seedData = { bokeh, grass, piles, stars, aube, aubeHy, aurM, aurHy, pines, motes, pads };
+  seedData = { bokeh, grass, stars, aube, aubeHy, aurM, aurHy, pines, motes, pads };
 }
 
 const hex = (h) => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
@@ -493,25 +591,6 @@ function drawMaree(b, t) {
     ctx.beginPath(); for (let x = 0; x <= W; x += 20) ctx.lineTo(x, y + Math.sin(x * 0.02 + i + t * 0.001) * 2); ctx.stroke();
   }
   ctx.restore(); ctx.globalAlpha = 1;
-  // ponton : l'eau grimpe le long des pieux quand la marée monte
-  const m = Math.min(W, H), pl = seedData.piles;
-  const top = pl.map(([px, py, s]) => [px * W, py * H - H * 0.13 * s]);
-  ctx.strokeStyle = "#4a3326"; ctx.lineCap = "round";
-  ctx.lineWidth = m * 0.016; ctx.beginPath(); top.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
-  ctx.strokeStyle = "#7a5843"; ctx.lineWidth = m * 0.006; ctx.beginPath(); top.forEach((p, i) => i ? ctx.lineTo(p[0], p[1] - m * 0.008) : ctx.moveTo(p[0], p[1] - m * 0.008)); ctx.stroke();
-  pl.forEach(([px, py, s]) => {
-    const x = px * W, y = py * H, ph = H * 0.13 * s, pw = m * 0.016 * s;
-    ctx.fillStyle = "#3d2a20"; ctx.fillRect(x - pw / 2, y - ph, pw, ph);
-    ctx.fillStyle = "rgba(255,220,180,.18)"; ctx.fillRect(x - pw / 2, y - ph, pw * 0.3, ph);
-    const depth = Math.max(0, Math.min(1, (edge(x, b) - y) / (H * 0.2)));
-    if (depth > 0) {
-      const wl = y - ph * 0.62 * depth;
-      ctx.fillStyle = "rgba(63,125,147,.92)"; ctx.fillRect(x - pw / 2 - 1, wl, pw + 2, y - wl + 1);
-      ctx.fillStyle = "rgba(160,120,90,.35)"; ctx.fillRect(x - pw / 2, wl - ph * 0.62 * (1 - depth) * 0.5, pw, ph * 0.62 * (1 - depth) * 0.5);
-      ctx.globalAlpha = 0.85; ctx.strokeStyle = "#fbfaf4"; ctx.lineWidth = 1.4;
-      ctx.beginPath(); ctx.ellipse(x, wl, pw * (1.4 + 0.3 * Math.sin(t * 0.004 + px * 20)), pw * 0.35, 0, 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
-    }
-  });
   // écume
   ctx.lineJoin = "round";
   [[0, 0.95, 3.2], [-H * 0.012, 0.45, 2], [-H * 0.028, 0.2, 1.5]].forEach(([dy, a, lw]) => {
@@ -826,7 +905,7 @@ const hot = window.claude && window.claude.hot;
 if (hot && hot.snapshot) hot.snapshot(() => ({ S }));
 
 window.addEventListener("resize", () => { resize(); aurGrads = new Map(); });
-resize(); syncUI(); renderDay();
+resize(); syncUI(); renderDay(); renderRem();
 requestAnimationFrame((n) => { lastFrame = n; frame(n); });
 })();
 </script>

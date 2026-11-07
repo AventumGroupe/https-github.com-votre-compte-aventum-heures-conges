@@ -1,4 +1,4 @@
-# Souffle d'Horizon
+# Cohérence cardiaque
 
 Application web de cohérence cardiaque inspirée de la méthode **365** du Dr David O'Hare :
 **3** fois par jour, **6** respirations par minute, **5** minutes.

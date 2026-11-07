@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0d1422">
 </head>
 <body>
-<title>Souffle d'Horizon</title>
+<title>Cohérence cardiaque</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Jost:wght@300;400;500&display=swap">
@@ -35,7 +35,7 @@ canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: bl
 /* ---------- Panneau d'accueil ---------- */
 .home {
   position: fixed; inset: 0; overflow-y: auto;
-  display: flex; align-items: flex-end; justify-content: flex-start;
+  display: flex; align-items: flex-start; justify-content: flex-start;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px));
@@ -43,20 +43,20 @@ canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: bl
 }
 @media (min-width: 760px) { .home { align-items: center; padding-left: max(48px, env(safe-area-inset-left, 0px)); } }
 .panel {
-  width: 100%; max-width: 430px; margin-top: auto;
+  width: 100%; max-width: 430px;
   background: var(--glass); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
   border: 1px solid var(--line); border-radius: 22px;
-  padding: 22px 20px 20px; display: grid; gap: 18px;
+  padding: 20px 20px 18px; display: grid; gap: 16px;
 }
 @media (min-width: 760px) { .panel { margin-top: 0; } }
 .brand { display: grid; gap: 4px; }
-.brand h1 { font-family: var(--display); font-weight: 400; font-size: 2rem; line-height: 1.1; margin: 0; letter-spacing: .01em; text-wrap: balance; }
-.brand p { margin: 0; color: var(--muted); font-size: .95rem; }
+.brand h1 { font-family: var(--display); font-weight: 400; font-size: clamp(1.5rem, 7vw, 2rem); line-height: 1.1; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+.brand p { margin: 0; color: var(--muted); font-size: .88rem; }
 .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 0 0 8px; }
 
 .journey { margin: 0; color: var(--muted); font-size: .9rem; max-width: 62ch; }
-.sliders { display: grid; gap: 16px; }
-.sl { display: grid; gap: 6px; }
+.sliders { display: grid; gap: 10px; }
+.sl { display: grid; gap: 2px; }
 .sl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .sl-head label { font-size: .72rem; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
 .sl-head output { font-size: .92rem; color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
@@ -187,27 +187,27 @@ details[open] summary::after { content: "–"; }
 <main class="home" id="home">
   <section class="panel" aria-labelledby="app-title">
     <div class="brand">
-      <h1 id="app-title">Souffle d'Horizon</h1>
-      <p>Cohérence cardiaque, méthode 365. Laissez l'image respirer pour vous.</p>
+      <h1 id="app-title">Cohérence cardiaque</h1>
+      <p>6 respirations par minute · 5 min · 3 fois par jour.<br>Le cœur se cale sur le souffle, le stress retombe.</p>
     </div>
 
-    <p class="journey">Cinq paysages se succèdent, un par minute : marée, aube, lotus, aurore, papillon. Chacun s'ouvre quand vous inspirez et se referme quand vous expirez.</p>
+    <button class="start" id="start">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>
+      Commencer
+    </button>
 
     <div class="sliders">
       <div class="sl">
         <div class="sl-head"><label for="s-rythme">Rythme</label><output id="v-rythme" for="s-rythme"></output></div>
         <input type="range" id="s-rythme" min="0" max="2" step="1" value="1">
-        <div class="ticks"><span>Découverte</span><span>Équilibre</span><span>Apaisement</span></div>
       </div>
       <div class="sl">
         <div class="sl-head"><label for="s-duree">Durée</label><output id="v-duree" for="s-duree"></output></div>
         <input type="range" id="s-duree" min="1" max="10" step="1" value="5">
-        <div class="ticks"><span>1 min</span><span>10 min</span></div>
       </div>
       <div class="sl">
         <div class="sl-head"><label for="s-son">Son</label><output id="v-son" for="s-son"></output></div>
         <input type="range" id="s-son" min="0" max="3" step="1" value="2">
-        <div class="ticks"><span>Silence</span><span>Bol</span><span>Musique</span><span>Les deux</span></div>
       </div>
       <div class="sl">
         <div class="sl-head"><label for="s-vol">Volume</label><output id="v-vol" for="s-vol"></output></div>
@@ -216,14 +216,8 @@ details[open] summary::after { content: "–"; }
       <div class="sl">
         <div class="sl-head"><label for="s-guide">Consignes</label><output id="v-guide" for="s-guide"></output></div>
         <input type="range" id="s-guide" min="0" max="2" step="1" value="1">
-        <div class="ticks"><span>Image seule</span><span>Mots</span><span>Mots et voix</span></div>
       </div>
     </div>
-
-    <button class="start" id="start">
-      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>
-      Commencer la séance
-    </button>
 
     <div class="day" aria-live="polite">
       <div class="day-head"><strong>Aujourd'hui</strong><span id="day-count">0 / 3 séances</span></div>
@@ -235,19 +229,6 @@ details[open] summary::after { content: "–"; }
       <div class="week" id="week" aria-label="Les 7 derniers jours"></div>
     </div>
 
-    <details>
-      <summary>La méthode 365</summary>
-      <div class="about">
-        <div class="rule">
-          <div><b>3</b><small>fois par jour</small></div>
-          <div><b>6</b><small>respirations / min</small></div>
-          <div><b>5</b><small>minutes</small></div>
-        </div>
-        <p>Popularisée par le Dr David O'Hare, la méthode 365 propose de respirer à six cycles par minute, pendant cinq minutes, trois fois par jour : au réveil, avant le déjeuner et en fin d'après-midi. À ce rythme, la variabilité du cœur se synchronise avec la respiration, ce qui favorise l'apaisement du système nerveux.</p>
-        <p>Respirez par le nez, sans forcer, en gonflant le ventre. Le rythme Apaisement allonge l'expiration pour un effet plus calmant, le rythme Découverte aide à démarrer.</p>
-        <p>Cette application ne remplace pas un avis médical. En cas de vertige, reprenez une respiration naturelle.</p>
-      </div>
-    </details>
   </section>
 </main>
 

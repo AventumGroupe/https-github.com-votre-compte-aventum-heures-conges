@@ -46,6 +46,23 @@ canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: bl
 .brand p { margin: 0; color: var(--muted); font-size: .95rem; }
 .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 0 0 8px; }
 
+.journey { margin: 0; color: var(--muted); font-size: .9rem; max-width: 62ch; }
+.sliders { display: grid; gap: 16px; }
+.sl { display: grid; gap: 6px; }
+.sl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.sl-head label { font-size: .72rem; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
+.sl-head output { font-size: .92rem; color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+.sl input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; cursor: pointer; margin: 0;
+}
+.sl input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--p, 50%), var(--line) var(--p, 50%)); }
+.sl input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
+.sl input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+.sl input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--text); border: 3px solid var(--accent); margin-top: -9px; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+.sl input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--text); border: 3px solid var(--accent); }
+.sl input[type="range"]:disabled { opacity: .35; cursor: default; }
+.ticks { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); margin-top: -4px; }
+.ticks span:first-child { text-align: left; } .ticks span:last-child { text-align: right; }
 .scenes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .scene-btn {
   appearance: none; border: 1px solid var(--line); border-radius: 14px; padding: 0; cursor: pointer;
@@ -166,52 +183,32 @@ details[open] summary::after { content: "–"; }
       <p>Cohérence cardiaque, méthode 365. Laissez l'image respirer pour vous.</p>
     </div>
 
-    <div>
-      <p class="label" id="lbl-scene">Paysage</p>
-      <div class="scenes" role="group" aria-labelledby="lbl-scene" id="scenes">
-        <button class="scene-btn" id="sc-maree" data-scene="maree" aria-pressed="true"><i class="sw sw-maree"></i><span>Marée</span></button>
-        <button class="scene-btn" id="sc-aube" data-scene="aube" aria-pressed="false"><i class="sw sw-aube"></i><span>Aube</span></button>
-        <button class="scene-btn" id="sc-lotus" data-scene="lotus" aria-pressed="false"><i class="sw sw-lotus"></i><span>Lotus</span></button>
-        <button class="scene-btn" id="sc-aurore" data-scene="aurore" aria-pressed="false"><i class="sw sw-aurore"></i><span>Aurore</span></button>
-        <button class="scene-btn" id="sc-papillon" data-scene="papillon" aria-pressed="false"><i class="sw sw-papillon"></i><span>Papillon</span></button>
-      </div>
-      <div class="chips" style="margin-top:10px"><button class="chip" id="t-voyage" aria-pressed="true">Changer de paysage chaque minute</button></div>
-      <p class="rate" id="scene-hint">La vague monte sur la plage à l'inspiration, se retire à l'expiration.</p>
-    </div>
+    <p class="journey">Cinq paysages se succèdent, un par minute : marée, aube, lotus, aurore, papillon. Chacun s'ouvre quand vous inspirez et se referme quand vous expirez.</p>
 
-    <div>
-      <p class="label" id="lbl-rythme">Rythme</p>
-      <div class="chips" role="group" aria-labelledby="lbl-rythme" id="presets">
-        <button class="chip" id="pr-55" data-in="5" data-out="5" aria-pressed="true">Équilibre<small>5 · 5</small></button>
-        <button class="chip" id="pr-46" data-in="4" data-out="6" aria-pressed="false">Apaisement<small>4 · 6</small></button>
-        <button class="chip" id="pr-45" data-in="4" data-out="5" aria-pressed="false">Découverte<small>4 · 5</small></button>
-        <button class="chip" id="pr-custom" data-custom="1" aria-pressed="false">Sur mesure</button>
+    <div class="sliders">
+      <div class="sl">
+        <div class="sl-head"><label for="s-rythme">Rythme</label><output id="v-rythme" for="s-rythme"></output></div>
+        <input type="range" id="s-rythme" min="0" max="2" step="1" value="1">
+        <div class="ticks"><span>Découverte</span><span>Équilibre</span><span>Apaisement</span></div>
       </div>
-      <div class="custom" id="custom" hidden>
-        <label class="range-row" for="r-in">Inspiration <input type="range" id="r-in" min="3" max="7" step="0.5" value="5"><output id="o-in">5 s</output></label>
-        <label class="range-row" for="r-out">Expiration <input type="range" id="r-out" min="3" max="8" step="0.5" value="5"><output id="o-out">5 s</output></label>
+      <div class="sl">
+        <div class="sl-head"><label for="s-duree">Durée</label><output id="v-duree" for="s-duree"></output></div>
+        <input type="range" id="s-duree" min="1" max="10" step="1" value="5">
+        <div class="ticks"><span>1 min</span><span>10 min</span></div>
       </div>
-      <p class="rate" id="rate">6 respirations par minute · 30 cycles en 5 min</p>
-    </div>
-
-    <div>
-      <p class="label" id="lbl-duree">Durée</p>
-      <div class="chips" role="group" aria-labelledby="lbl-duree" id="durations">
-        <button class="chip" id="du-3" data-min="3" aria-pressed="false">3 min</button>
-        <button class="chip" id="du-5" data-min="5" aria-pressed="true">5 min<small>365</small></button>
-        <button class="chip" id="du-10" data-min="10" aria-pressed="false">10 min</button>
+      <div class="sl">
+        <div class="sl-head"><label for="s-son">Son</label><output id="v-son" for="s-son"></output></div>
+        <input type="range" id="s-son" min="0" max="3" step="1" value="2">
+        <div class="ticks"><span>Silence</span><span>Bol</span><span>Musique</span><span>Les deux</span></div>
       </div>
-    </div>
-
-    <div>
-      <p class="label" id="lbl-guide">Accompagnement</p>
-      <div class="toggles" role="group" aria-labelledby="lbl-guide">
-        <button class="chip" id="t-music" aria-pressed="true">Musique zen</button>
-        <button class="chip" id="t-nature" aria-pressed="true">Sons de nature</button>
-        <button class="chip" id="t-bell" aria-pressed="false">Bol chantant</button>
-        <button class="chip" id="t-voice" aria-pressed="false">Voix</button>
-        <button class="chip" id="t-vibe" aria-pressed="false">Vibration</button>
-        <button class="chip" id="t-text" aria-pressed="true">Mots à l'écran</button>
+      <div class="sl">
+        <div class="sl-head"><label for="s-vol">Volume</label><output id="v-vol" for="s-vol"></output></div>
+        <input type="range" id="s-vol" min="0" max="100" step="5" value="60">
+      </div>
+      <div class="sl">
+        <div class="sl-head"><label for="s-guide">Consignes</label><output id="v-guide" for="s-guide"></output></div>
+        <input type="range" id="s-guide" min="0" max="2" step="1" value="1">
+        <div class="ticks"><span>Image seule</span><span>Mots</span><span>Mots et voix</span></div>
       </div>
     </div>
 
@@ -289,12 +286,18 @@ const buf = document.createElement("canvas"), bufCtx = buf.getContext("2d");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ================= Réglages ================= */
-const S = { scene: "maree", inh: 5, exh: 5, minutes: 5, music: true, nature: true, voyage: true, bell: false, voice: false, vibe: false, text: true };
+const RYTHMES = [{ n: "Découverte", i: 4, e: 5 }, { n: "Équilibre", i: 5, e: 5 }, { n: "Apaisement", i: 4, e: 6 }];
+const SONS = ["Silence", "Bol chantant", "Musique douce", "Musique et bol"];
+const GUIDES = ["Image seule", "Mots à l'écran", "Mots et voix"];
+const S = { scene: "maree", rythme: 1, inh: 5, exh: 5, minutes: 5, son: 2, vol: 60, guide: 1 };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 };
-Object.assign(S, store.get("souffle.settings", {}));
+Object.assign(S, store.get("souffle.reglages", {}));
+S.scene = "maree";
+const wantsMusic = () => S.son === 2 || S.son === 3;
+const wantsBowl = () => S.son === 1 || S.son === 3;
 
 const SUBS = {
   maree: ["la marée monte", "la marée descend"],
@@ -303,42 +306,23 @@ const SUBS = {
   aurore: ["l'aurore s'élève", "l'aurore s'apaise"],
   papillon: ["le papillon ouvre ses ailes", "il les referme"]
 };
-const HINTS = {
-  maree: "La marée monte à l'inspiration : l'eau gagne la plage et grimpe le long du ponton. Elle descend à l'expiration.",
-  aube: "Le soleil se lève à l'inspiration, redescend doucement à l'expiration.",
-  lotus: "Le lotus s'ouvre à l'inspiration, se referme à l'expiration.",
-  aurore: "L'aurore boréale s'élève à l'inspiration, s'apaise à l'expiration.",
-  papillon: "Le papillon ouvre ses ailes à l'inspiration, les referme à l'expiration."
-};
 
-function press(groupSel, btn) { document.querySelectorAll(groupSel).forEach(b => b.setAttribute("aria-pressed", String(b === btn))); }
+function paintRange(el) { const p = (el.value - el.min) / (el.max - el.min) * 100; el.style.setProperty("--p", p + "%"); }
 function syncUI() {
-  document.querySelectorAll(".scene-btn").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.scene === S.scene)));
-  $("scene-hint").textContent = HINTS[S.scene] + (S.voyage ? " Puis les paysages se succèdent, un par minute." : "");
-  let matched = null;
-  document.querySelectorAll("#presets .chip").forEach(b => { if (!b.dataset.custom && +b.dataset.in === S.inh && +b.dataset.out === S.exh && !S.custom) matched = b; });
-  press("#presets .chip", matched || $("pr-custom"));
-  $("custom").hidden = !!matched;
-  $("r-in").value = S.inh; $("r-out").value = S.exh;
-  $("o-in").textContent = fmtS(S.inh); $("o-out").textContent = fmtS(S.exh);
-  document.querySelectorAll("#durations .chip").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.min === S.minutes)));
-  [["t-music","music"],["t-nature","nature"],["t-bell","bell"],["t-voice","voice"],["t-vibe","vibe"],["t-text","text"]].forEach(([id,k]) => $(id).setAttribute("aria-pressed", String(!!S[k])));
-  const cyc = S.inh + S.exh, rpm = 60 / cyc, cycles = Math.round(S.minutes * 60 / cyc);
-  $("rate").textContent = `${rpm.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} respirations par minute · ${cycles} cycles en ${S.minutes} min`;
-  store.set("souffle.settings", S);
+  const r = RYTHMES[S.rythme]; S.inh = r.i; S.exh = r.e;
+  const cyc = S.inh + S.exh, cycles = Math.round(S.minutes * 60 / cyc);
+  $("s-rythme").value = S.rythme; $("s-duree").value = S.minutes; $("s-son").value = S.son; $("s-vol").value = S.vol; $("s-guide").value = S.guide;
+  $("v-rythme").textContent = `${r.n} · ${r.i} s / ${r.e} s`;
+  $("v-duree").textContent = `${S.minutes} min · ${cycles} respirations${S.minutes === 5 ? " · 365" : ""}`;
+  $("v-son").textContent = SONS[S.son];
+  $("v-vol").textContent = S.son === 0 ? "—" : `${S.vol} %`;
+  $("v-guide").textContent = GUIDES[S.guide];
+  $("s-vol").disabled = S.son === 0;
+  document.querySelectorAll(".sl input").forEach(paintRange);
+  store.set("souffle.reglages", S);
 }
-const fmtS = (v) => `${String(v).replace(".", ",")} s`;
-
-document.querySelectorAll(".scene-btn").forEach(b => b.addEventListener("click", () => { S.scene = b.dataset.scene; setScene(S.scene); syncUI(); }));
-document.querySelectorAll("#presets .chip").forEach(b => b.addEventListener("click", () => {
-  if (b.dataset.custom) { S.custom = true; } else { S.custom = false; S.inh = +b.dataset.in; S.exh = +b.dataset.out; }
-  syncUI();
-}));
-$("r-in").addEventListener("input", e => { S.custom = true; S.inh = +e.target.value; syncUI(); });
-$("r-out").addEventListener("input", e => { S.custom = true; S.exh = +e.target.value; syncUI(); });
-document.querySelectorAll("#durations .chip").forEach(b => b.addEventListener("click", () => { S.minutes = +b.dataset.min; syncUI(); }));
-[["t-music","music"],["t-nature","nature"],["t-bell","bell"],["t-voice","voice"],["t-vibe","vibe"],["t-text","text"]].forEach(([id,k]) =>
-  $(id).addEventListener("click", () => { S[k] = !S[k]; syncUI(); }));
+[["s-rythme", "rythme"], ["s-duree", "minutes"], ["s-son", "son"], ["s-vol", "vol"], ["s-guide", "guide"]].forEach(([id, k]) =>
+  $(id).addEventListener("input", e => { S[k] = +e.target.value; syncUI(); if (k === "vol" || k === "son") audioLevel(); }));
 
 /* ================= Journal 365 ================= */
 const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -366,167 +350,83 @@ function logSession() {
 }
 
 /* ================= Son =================
-   Trois couches, toutes générées en direct :
-   - Musique zen : bourdon grave + notes de bol / handpan sur une gamme pentatonique, dans une longue réverbération.
-   - Sons de nature : bruit filtré qui suit le souffle en continu (la vague arrive à l'inspiration, se retire à l'expiration).
-   - Bol chantant : un bol frappé au début de chaque inspiration (et plus doux à l'expiration). */
+   Volontairement simple et propre : uniquement des sons purs (sinusoïdes), aucun bruit synthétique.
+   - Musique douce : un accord tenu de ré qui enfle à l'inspiration et se pose à l'expiration,
+     avec de rares notes de bol, dans un écho léger.
+   - Bol chantant : un bol au début de chaque inspiration, plus doux à l'expiration.
+   Le moteur audio travaille avec une grande mémoire tampon (latencyHint "playback") pour ne pas
+   être perturbé par l'animation. */
 let AC = null, A = null;
-const PENTA = [146.83, 174.61, 196.0, 220.0, 261.63, 293.66, 349.23, 392.0, 440.0, 523.25]; // ré mineur pentatonique
-function makeNoise(seconds, color) {
-  const len = Math.floor(AC.sampleRate * seconds), buf = AC.createBuffer(2, len, AC.sampleRate);
-  for (let c = 0; c < 2; c++) {
-    const d = buf.getChannelData(c); let b0 = 0, b1 = 0, b2 = 0, last = 0;
-    for (let i = 0; i < len; i++) {
-      const w = Math.random() * 2 - 1;
-      if (color === "brown") { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
-      else { b0 = 0.99765 * b0 + w * 0.099; b1 = 0.963 * b1 + w * 0.2965; b2 = 0.57 * b2 + w * 1.0526; d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.2; }
-    }
-  }
-  return buf;
-}
-function makeImpulse(seconds) {
-  const len = Math.floor(AC.sampleRate * seconds), buf = AC.createBuffer(2, len, AC.sampleRate);
-  for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
-  return buf;
-}
-function audioInit() {
-  if (AC) return;
-  try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; return; }
-  const out = AC.createDynamicsCompressor(); out.threshold.value = -8; out.knee.value = 12; out.ratio.value = 2; out.attack.value = 0.05; out.release.value = 1; out.connect(AC.destination);
-  const master = AC.createGain(); master.gain.value = 0; master.connect(out);
-  const verb = AC.createConvolver(); verb.buffer = makeImpulse(3.8);
-  const wet = AC.createGain(); wet.gain.value = 0.75; verb.connect(wet).connect(master);
-  // bourdon
-  const music = AC.createGain(); music.gain.value = 0; music.connect(master); music.connect(verb);
-  const droneF = AC.createBiquadFilter(); droneF.type = "lowpass"; droneF.frequency.value = 420; droneF.connect(music);
-  const droneG = AC.createGain(); droneG.gain.value = 0.05; droneG.connect(droneF);
-  [[73.42, 0], [73.42, 0.35], [110.0, -0.25], [146.83, 0.2]].forEach(([f, det], i) => {
-    const o = AC.createOscillator(); o.type = "sine"; o.frequency.value = f + det;
-    const g = AC.createGain(); g.gain.value = [0.55, 0.45, 0.3, 0.12][i]; o.connect(g).connect(droneG); o.start();
-    const lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.05 + i * 0.023; lg.gain.value = g.gain.value * 0.4;
-    lfo.connect(lg).connect(g.gain); lfo.start();
-  });
-  const notes = AC.createGain(); notes.gain.value = 1; notes.connect(music);
-  // nature : deux couches de bruit filtré
-  const nature = AC.createGain(); nature.gain.value = 0; nature.connect(master);
-  const pink = makeNoise(6, "pink"), brown = makeNoise(6, "brown");
-  const src1 = AC.createBufferSource(); src1.buffer = brown; src1.loop = true;
-  const f1 = AC.createBiquadFilter(); f1.type = "lowpass"; f1.frequency.value = 400; f1.Q.value = 0.4;
-  const g1 = AC.createGain(); g1.gain.value = 0; src1.connect(f1).connect(g1).connect(nature); src1.start();
-  const src2 = AC.createBufferSource(); src2.buffer = pink; src2.loop = true; src2.loopStart = 0.5;
-  const f2 = AC.createBiquadFilter(); f2.type = "bandpass"; f2.frequency.value = 2500; f2.Q.value = 0.6;
-  const g2 = AC.createGain(); g2.gain.value = 0; src2.connect(f2).connect(g2).connect(nature); src2.start(0, 2.3);
-  // gouttes, pour le lotus
-  const bowls = AC.createGain(); bowls.gain.value = 0.9; bowls.connect(master); bowls.connect(verb);
-  A = { nextFrame: 0, master, verb, music, droneG, droneF, notes, nature, f1, g1, f2, g2, bowls, nextNote: 0, nextDrop: 0, prevB: 0 };
-}
-/* Chaque réglage n'a jamais qu'une seule consigne en attente : on efface la précédente avant d'en poser une nouvelle.
-   (Empiler des consignes à chaque image saturait le moteur audio : micro-coupures puis silence.) */
+const NOTES = [293.66, 349.23, 392.0, 440.0, 523.25, 587.33]; // ré, fa, sol, la, do, ré : pentatonique
 function glide(param, value, tc) {
   const t = AC.currentTime;
   if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(t); else { const v = param.value; param.cancelScheduledValues(t); param.setValueAtTime(v, t); }
   param.setTargetAtTime(value, t, tc);
 }
-function audioAlive() {
-  if (AC && (AC.state === "suspended" || AC.state === "interrupted")) { try { AC.resume(); } catch (e) {} }
+function audioAlive() { if (AC && AC.state !== "running" && AC.state !== "closed") { try { AC.resume(); } catch (e) {} } }
+function audioInit() {
+  if (AC) return;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  try { AC = new Ctx({ latencyHint: "playback" }); } catch (e) { try { AC = new Ctx(); } catch (e2) { AC = null; return; } }
+  const master = AC.createGain(); master.gain.value = 0; master.connect(AC.destination);
+  // écho doux, gauche / droite
+  const send = AC.createGain(); send.gain.value = 0.28;
+  const merger = AC.createChannelMerger(2); merger.connect(master);
+  [[0.41, 0], [0.57, 1]].forEach(([d, ch]) => {
+    const dl = AC.createDelay(1), fb = AC.createGain(), lp = AC.createBiquadFilter();
+    dl.delayTime.value = d; fb.gain.value = 0.32; lp.type = "lowpass"; lp.frequency.value = 1800;
+    send.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(merger, 0, ch);
+  });
+  // accord tenu : ré, la, ré (deux voix très légèrement désaccordées pour un battement lent)
+  const drone = AC.createGain(); drone.gain.value = 0; drone.connect(master);
+  [[146.83, 0.5], [147.08, 0.35], [220.0, 0.28], [293.66, 0.12]].forEach(([f, g]) => {
+    const o = AC.createOscillator(), og = AC.createGain(); o.type = "sine"; o.frequency.value = f; og.gain.value = g;
+    o.connect(og); og.connect(drone); o.start();
+  });
+  const notes = AC.createGain(); notes.gain.value = 1; notes.connect(master); notes.connect(send);
+  A = { master, drone, notes };
 }
-function audioStart() {
-  if (!AC) return;
-  if (AC.state === "suspended") AC.resume();
-  const t = AC.currentTime;
-  glide(A.master.gain, 0.9, 1.2);
-  glide(A.music.gain, S.music ? 1 : 0, 1.5);
-  glide(A.nature.gain, S.nature ? 1 : 0, 1.5);
-  A.nextNote = t + 1.5;
+function audioLevel() {
+  if (!AC || !A) return;
+  const on = S.son !== 0 && (mode === "run" || mode === "intro") && !paused;
+  glide(A.master.gain, on ? Math.pow(S.vol / 100, 1.6) : 0, on ? 0.6 : 0.4);
+  if (!wantsMusic()) glide(A.drone.gain, 0, 0.5);
 }
+function audioStart() { if (!AC) return; audioAlive(); audioLevel(); if (wantsMusic()) glide(A.drone.gain, 0.05, 1.5); }
 function audioStop() { if (AC && A) glide(A.master.gain, 0, 0.8); }
-
-// une note de handpan / bol tibétain doux : fondamentale + partiels inharmoniques, attaque feutrée, longue résonance
-function zenNote(f, vol, when) {
-  const t = when || AC.currentTime;
-  [[1, 1, 5.5], [2.0, 0.22, 3.2], [2.98, 0.08, 2.0], [4.1, 0.03, 1.2]].forEach(([m, a, d]) => {
+function tone(f, vol, when, decay, partial) {
+  const t = Math.max(when || 0, AC.currentTime);
+  [[1, 1], [2, partial || 0.12]].forEach(([m, a]) => {
     const o = AC.createOscillator(), g = AC.createGain();
     o.type = "sine"; o.frequency.value = f * m;
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol * a, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-    o.connect(g).connect(A.notes); o.start(t); o.stop(t + d + 0.1);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * a, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + decay / m);
+    o.connect(g); g.connect(A.notes); o.start(t); o.stop(t + decay / m + 0.05);
   });
 }
 function singingBowl(f, vol) {
   const t = AC.currentTime;
-  [[1, 1, 9], [2.71, 0.35, 6], [5.15, 0.12, 3.5]].forEach(([m, a, d]) => {
-    [0, 0.8].forEach(beat => {
-      const o = AC.createOscillator(), g = AC.createGain();
-      o.type = "sine"; o.frequency.value = f * m + beat;
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol * a * 0.5, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-      o.connect(g).connect(A.bowls); o.start(t); o.stop(t + d + 0.1);
-    });
-  });
+  [[1, 1, 7], [2.76, 0.22, 4]].forEach(([m, a, d]) => [0, 0.6].forEach(beat => {
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = "sine"; o.frequency.value = f * m + beat;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * a * 0.5, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(A.notes); o.start(t); o.stop(t + d + 0.05);
+  }));
 }
-function drop() {
-  const t = AC.currentTime, o = AC.createOscillator(), g = AC.createGain(), f = 900 + Math.random() * 900;
-  o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.9, t + 0.09);
-  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-  o.connect(g).connect(A.bowls); o.start(t); o.stop(t + 0.2);
-}
-function bird() {
-  const t0 = AC.currentTime, n = 2 + Math.floor(Math.random() * 3), base = 2400 + Math.random() * 1600;
-  for (let i = 0; i < n; i++) {
-    const t = t0 + i * (0.13 + Math.random() * 0.05), o = AC.createOscillator(), g = AC.createGain();
-    o.type = "sine"; o.frequency.setValueAtTime(base, t); o.frequency.exponentialRampToValueAtTime(base * (1.25 + Math.random() * 0.3), t + 0.07);
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.018, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
-    o.connect(g).connect(A.bowls); o.start(t); o.stop(t + 0.12);
-  }
-}
-// début de phase : une note qui monte à l'inspiration, qui descend à l'expiration
+// début de phase : l'accord enfle à l'inspiration, se pose à l'expiration ; une note de temps en temps
 function audioPhase(inhale, dur) {
   if (!AC || !A) return;
-  const t = AC.currentTime;
   audioAlive();
-  glide(A.music.gain, S.music ? 1 : 0, 0.5);
-  glide(A.nature.gain, S.nature ? 1 : 0, 0.5);
-  glide(A.droneF.frequency, inhale ? 650 : 380, dur / 3);
-  if (S.music) {
-    const pool = inhale ? PENTA.slice(4) : PENTA.slice(0, 6);
-    zenNote(pool[Math.floor(Math.random() * pool.length)], 0.11);
-    if (Math.random() < 0.55) zenNote(pool[Math.floor(Math.random() * pool.length)] * (Math.random() < 0.3 ? 2 : 1), 0.05, t + dur * (0.4 + Math.random() * 0.3));
+  if (wantsMusic()) {
+    glide(A.drone.gain, inhale ? 0.11 : 0.04, dur / 2.5);
+    if (Math.random() < 0.6) {
+      const pool = inhale ? NOTES.slice(2) : NOTES.slice(0, 4);
+      tone(pool[Math.floor(Math.random() * pool.length)], 0.06, AC.currentTime + 0.3, 5);
+    }
   }
-  if (S.bell) singingBowl(inhale ? 220 : 196, inhale ? 0.16 : 0.09);
-}
-// appelée à chaque image : la nature suit la courbe du souffle (b de 0 à 1)
-function audioFrame(b, inhale) {
-  if (!AC || !A || !S.nature) return;
-  const t = AC.currentTime;
-  if (t < A.nextFrame) return;
-  A.nextFrame = t + 0.1;
-  const k = 0.12, v = {};
-  if (curScene === "maree") {
-    // la vague roule et gronde quand elle monte, l'écume pétille quand elle redescend
-    v.f1_frequency = 250 + 1100 * b;
-    v.g1_gain = 0.06 + 0.32 * b;
-    v.f2_frequency = 3800; v.f2_Q = 0.5;
-    v.g2_gain = inhale ? 0.015 + 0.02 * b : 0.02 + 0.07 * b;
-  } else if (curScene === "aube") {
-    v.f1_frequency = 180 + 300 * b; v.g1_gain = 0.03 + 0.05 * b;
-    v.f2_frequency = 500 + 500 * b; v.f2_Q = 1.6;
-    v.g2_gain = 0.02 + 0.06 * b;
-  } else if (curScene === "lotus") {
-    v.f1_frequency = 300 + 200 * b; v.g1_gain = 0.05;
-    v.f2_frequency = 1400; v.f2_Q = 1; v.g2_gain = 0.008 + 0.012 * b;
-    if (t > A.nextDrop) { drop(); A.nextDrop = t + 1.5 + Math.random() * 4; }
-  } else if (curScene === "papillon") {
-    v.f1_frequency = 200 + 250 * b; v.g1_gain = 0.02 + 0.04 * b;
-    v.f2_frequency = 1800 + 800 * b; v.f2_Q = 0.8; v.g2_gain = 0.006 + 0.014 * b;
-    if (t > A.nextDrop) { bird(); A.nextDrop = t + 3 + Math.random() * 6; }
-  } else {
-    v.f1_frequency = 150 + 150 * b; v.g1_gain = 0.025 + 0.03 * b;
-    v.f2_frequency = 900 + 900 * b; v.f2_Q = 2.5;
-    v.g2_gain = 0.012 + 0.05 * b;
-  }
-  const P = { f1_frequency: A.f1.frequency, f2_frequency: A.f2.frequency, f2_Q: A.f2.Q, g1_gain: A.g1.gain, g2_gain: A.g2.gain };
-  for (const key in v) glide(P[key], v[key], k);
+  if (wantsBowl()) singingBowl(inhale ? 220 : 196, inhale ? 0.14 : 0.08);
 }
 function say(text) {
-  if (!S.voice || !("speechSynthesis" in window)) return;
+  if (S.guide !== 2 || !("speechSynthesis" in window)) return;
   try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "fr-FR"; u.rate = 0.8; u.pitch = 0.9; u.volume = 0.8; speechSynthesis.speak(u); } catch (e) {}
 }
 function vibe(inhale) { if (S.vibe && navigator.vibrate) { try { navigator.vibrate(inhale ? 60 : [30, 80, 30]); } catch (e) {} } }
@@ -535,7 +435,7 @@ function vibe(inhale) { if (S.vibe && navigator.vibrate) { try { navigator.vibra
 let W = 0, H = 0, DPR = 1, seedData = null;
 function rng(seed) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
 function resize() {
-  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  DPR = Math.min(window.devicePixelRatio || 1, 1.5);
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
   buildSeeds();
@@ -814,7 +714,7 @@ function drawAurore(b, t) {
 const SCENES = { maree: drawMaree, aube: drawAube, lotus: drawLotus, aurore: drawAurore, papillon: drawPapillon };
 const ORDER = ["maree", "aube", "lotus", "aurore", "papillon"];
 /* alternance : un paysage par minute, avec un fondu de 3 secondes au début d'une inspiration */
-let curScene = S.scene, prevScene = null, fadeT = 1, lastSwitchMin = 0;
+let lastPreviewIdx = -1, curScene = S.scene, prevScene = null, fadeT = 1, lastSwitchMin = 0;
 const FADE = 3000;
 function setScene(name) { if (name === curScene) return; prevScene = curScene; curScene = name; fadeT = 0; }
 
@@ -837,10 +737,10 @@ function releaseAwake() { try { wake && wake.release(); } catch (e) {} wake = nu
 function show(el, on) { el.classList.toggle("fade-out", !on); el.setAttribute("aria-hidden", String(!on)); }
 
 function start() {
-  audioInit(); audioStart();
   const cyc = S.inh + S.exh;
   totalMs = Math.max(1, Math.round(S.minutes * 60 / cyc)) * cyc * 1000;
   runMs = 0; introMs = 0; paused = false; lastPhase = null; mode = "intro"; lastSwitchMin = 0; setScene(S.scene);
+  audioInit(); audioStart();
   show($("home"), false); show($("hud"), true); show($("end"), false);
   $("paused").hidden = true; setPauseIcon();
   $("word").textContent = "Installez-vous"; $("word").style.opacity = 1; $("count").textContent = "le dos droit, les épaules relâchées";
@@ -859,9 +759,8 @@ function stopSession(completed) {
     $("end-title").textContent = n >= 3 ? "Journée 365 accomplie" : "Séance terminée";
     $("end-text").textContent = `${cycles} respirations, ${S.minutes} minutes. ${n >= 3 ? "Trois séances aujourd'hui, bravo." : `Séance ${n} sur 3 aujourd'hui.`}`;
     document.querySelectorAll("#feel .chip").forEach(c => c.setAttribute("aria-pressed", "false"));
-    show($("end"), true); if (AC && S.bell) singingBowl(196, 0.14); say("Séance terminée. Revenez doucement.");
+    show($("end"), true); if (AC && wantsBowl()) { glide(A.master.gain, Math.pow(S.vol / 100, 1.6), 0.2); singingBowl(196, 0.12); setTimeout(audioStop, 6000); } say("Séance terminée. Revenez doucement.");
   } else { mode = "home"; show($("home"), true); }
-  setScene(S.scene);
 }
 function setPauseIcon() {
   $("pause").innerHTML = paused ? '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg>' : '<svg viewBox="0 0 16 16"><path d="M4 2h3v12H4zM9 2h3v12H9z"/></svg>';
@@ -870,7 +769,7 @@ function setPauseIcon() {
 function togglePause() {
   if (mode !== "run" && mode !== "intro") return;
   paused = !paused; $("paused").hidden = !paused; setPauseIcon();
-  if (paused) { audioStop(); try { speechSynthesis.cancel(); } catch (e) {} } else { lastPhase = null; audioStart(); }
+  if (paused) { audioLevel(); try { speechSynthesis.cancel(); } catch (e) {} } else { lastPhase = null; audioStart(); }
 }
 $("start").addEventListener("click", start);
 $("pause").addEventListener("click", togglePause);
@@ -892,7 +791,8 @@ function frame(now) {
   const dt = Math.min(100, now - lastFrame); lastFrame = now;
   let b;
   if (mode === "home" || mode === "done") {
-    previewMs += dt; b = breathAt(previewMs).b;
+    previewMs += dt; const pv = breathAt(previewMs); b = pv.b;
+    if (pv.idx !== lastPreviewIdx) { if (lastPreviewIdx >= 0 && pv.idx % 3 === 0) setScene(ORDER[(ORDER.indexOf(curScene) + 1) % ORDER.length]); lastPreviewIdx = pv.idx; }
   } else if (mode === "intro") {
     if (!paused) introMs += dt;
     b = 0;
@@ -906,7 +806,7 @@ function frame(now) {
       if (ph !== lastPhase) {
         lastPhase = ph;
         const minute = Math.floor(runMs / 60000);
-        if (st.inhale && S.voyage && minute > lastSwitchMin && totalMs - runMs > 20000) {
+        if (st.inhale && minute > lastSwitchMin && totalMs - runMs > 20000) {
           lastSwitchMin = minute; setScene(ORDER[(ORDER.indexOf(curScene) + 1) % ORDER.length]);
         }
         const dur = st.inhale ? S.inh : S.exh;
@@ -917,8 +817,7 @@ function frame(now) {
       }
       const left = Math.ceil(st.left);
       $("count").textContent = $("count").dataset.sub + "  " + "·".repeat(Math.max(1, left));
-      audioFrame(st.b, st.inhale);
-      $("cue").style.visibility = S.text ? "visible" : "hidden";
+      $("cue").style.visibility = S.guide >= 1 ? "visible" : "hidden";
       $("time").textContent = fmtClock(totalMs - runMs);
       $("bar").style.width = `${Math.min(100, runMs / totalMs * 100)}%`;
       if (runMs >= totalMs) stopSession(true);

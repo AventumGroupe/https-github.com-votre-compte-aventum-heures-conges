@@ -13,13 +13,16 @@ Au lieu de la classique boule qui monte et descend, ce sont des **paysages vivan
 | Aurore | l'aurore boréale s'élève et s'intensifie | elle s'apaise au-dessus du lac |
 | Papillon | il ouvre ses ailes, posé sur une fleur | il les referme |
 
-Option **Changer de paysage chaque minute** : les cinq paysages se succèdent pendant la séance, avec un fondu enchaîné au début d'une inspiration.
-
 ## Fonctionnalités
 
-- Rythmes : Équilibre 5 s / 5 s, Apaisement 4 s / 6 s (expiration longue), Découverte 4 s / 5 s, ou sur mesure.
-- Durées : 3, 5 (recommandé) ou 10 minutes ; la séance se termine toujours sur un cycle complet.
-- Accompagnement au choix : musique zen (bourdon grave et notes de handpan en gamme pentatonique, longue réverbération), sons de nature qui suivent le souffle (la vague gronde en montant, l'écume pétille en redescendant), bol chantant, voix (« Inspirez / Expirez »), vibration (Android), mots à l'écran.
+- Les cinq paysages se succèdent automatiquement, un par minute, avec un fondu enchaîné au début d'une inspiration.
+- Réglages par curseurs :
+  - Rythme : Découverte 4 s / 5 s, Équilibre 5 s / 5 s, Apaisement 4 s / 6 s (expiration longue).
+  - Durée : de 1 à 10 minutes (5 minutes pour la méthode 365).
+  - Son : silence, bol chantant, musique douce, ou musique et bol.
+  - Volume.
+  - Consignes : image seule, mots à l'écran, ou mots et voix.
+- Son volontairement épuré : uniquement des sons purs (accord tenu qui enfle à l'inspiration, rares notes pentatoniques, bol chantant), sans bruit synthétique.
 - Suivi 365 : trois créneaux du jour (matin, midi, soir) et les 7 derniers jours, stockés localement dans le navigateur.
 - Ressenti en fin de séance, écran maintenu allumé pendant la séance, raccourcis clavier (Espace = pause, Échap = arrêter).
 

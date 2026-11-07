@@ -132,7 +132,7 @@ details[open] summary::after { content: "–"; }
   text-shadow: 0 1px 2px rgba(0,0,0,.35), 0 2px 22px rgba(0,0,0,.55);
 }
 .cue .word { font-family: var(--display); font-size: clamp(2.2rem, 7vw, 3.6rem); line-height: 1; letter-spacing: .04em; transition: opacity .6s ease; }
-.cue .count { font-size: .95rem; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: .2em; }
+.cue .count { font-size: 1rem; color: var(--text); opacity: .85; font-variant-numeric: tabular-nums; letter-spacing: .08em; font-style: italic; }
 .progress { position: absolute; left: 0; right: 0; bottom: 0; height: calc(3px + env(safe-area-inset-bottom, 0px)); }
 .progress div { height: 3px; width: 0%; background: var(--accent); opacity: .8; }
 .paused-note { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--display); font-size: 1.6rem; color: var(--text); text-shadow: 0 2px 18px rgba(0,0,0,.5); }
@@ -203,8 +203,9 @@ details[open] summary::after { content: "–"; }
     <div>
       <p class="label" id="lbl-guide">Accompagnement</p>
       <div class="toggles" role="group" aria-labelledby="lbl-guide">
-        <button class="chip" id="t-sound" aria-pressed="true">Nappe sonore</button>
-        <button class="chip" id="t-bell" aria-pressed="false">Clochette</button>
+        <button class="chip" id="t-music" aria-pressed="true">Musique zen</button>
+        <button class="chip" id="t-nature" aria-pressed="true">Sons de nature</button>
+        <button class="chip" id="t-bell" aria-pressed="false">Bol chantant</button>
         <button class="chip" id="t-voice" aria-pressed="false">Voix</button>
         <button class="chip" id="t-vibe" aria-pressed="false">Vibration</button>
         <button class="chip" id="t-text" aria-pressed="true">Mots à l'écran</button>
@@ -283,15 +284,21 @@ const canvas = $("scene"), ctx = canvas.getContext("2d");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ================= Réglages ================= */
-const S = { scene: "maree", inh: 5, exh: 5, minutes: 5, sound: true, bell: false, voice: false, vibe: false, text: true };
+const S = { scene: "maree", inh: 5, exh: 5, minutes: 5, music: true, nature: true, bell: false, voice: false, vibe: false, text: true };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 };
 Object.assign(S, store.get("souffle.settings", {}));
 
+const SUBS = {
+  maree: ["la marée monte", "la marée descend"],
+  aube: ["le soleil se lève", "le soleil se couche"],
+  lotus: ["le lotus s'ouvre", "le lotus se referme"],
+  aurore: ["l'aurore s'élève", "l'aurore s'apaise"]
+};
 const HINTS = {
-  maree: "La vague monte sur la plage à l'inspiration, se retire à l'expiration.",
+  maree: "La marée monte à l'inspiration : l'eau gagne la plage et grimpe le long du ponton. Elle descend à l'expiration.",
   aube: "Le soleil se lève à l'inspiration, redescend doucement à l'expiration.",
   lotus: "Le lotus s'ouvre à l'inspiration, se referme à l'expiration.",
   aurore: "L'aurore boréale s'élève à l'inspiration, s'apaise à l'expiration."
@@ -308,7 +315,7 @@ function syncUI() {
   $("r-in").value = S.inh; $("r-out").value = S.exh;
   $("o-in").textContent = fmtS(S.inh); $("o-out").textContent = fmtS(S.exh);
   document.querySelectorAll("#durations .chip").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.min === S.minutes)));
-  [["t-sound","sound"],["t-bell","bell"],["t-voice","voice"],["t-vibe","vibe"],["t-text","text"]].forEach(([id,k]) => $(id).setAttribute("aria-pressed", String(!!S[k])));
+  [["t-music","music"],["t-nature","nature"],["t-bell","bell"],["t-voice","voice"],["t-vibe","vibe"],["t-text","text"]].forEach(([id,k]) => $(id).setAttribute("aria-pressed", String(!!S[k])));
   const cyc = S.inh + S.exh, rpm = 60 / cyc, cycles = Math.round(S.minutes * 60 / cyc);
   $("rate").textContent = `${rpm.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} respirations par minute · ${cycles} cycles en ${S.minutes} min`;
   store.set("souffle.settings", S);
@@ -323,7 +330,7 @@ document.querySelectorAll("#presets .chip").forEach(b => b.addEventListener("cli
 $("r-in").addEventListener("input", e => { S.custom = true; S.inh = +e.target.value; syncUI(); });
 $("r-out").addEventListener("input", e => { S.custom = true; S.exh = +e.target.value; syncUI(); });
 document.querySelectorAll("#durations .chip").forEach(b => b.addEventListener("click", () => { S.minutes = +b.dataset.min; syncUI(); }));
-[["t-sound","sound"],["t-bell","bell"],["t-voice","voice"],["t-vibe","vibe"],["t-text","text"]].forEach(([id,k]) =>
+[["t-music","music"],["t-nature","nature"],["t-bell","bell"],["t-voice","voice"],["t-vibe","vibe"],["t-text","text"]].forEach(([id,k]) =>
   $(id).addEventListener("click", () => { S[k] = !S[k]; syncUI(); }));
 
 /* ================= Journal 365 ================= */
@@ -351,36 +358,136 @@ function logSession() {
   store.set("souffle.log", log);
 }
 
-/* ================= Son ================= */
-let AC = null, pad = null;
+/* ================= Son =================
+   Trois couches, toutes générées en direct :
+   - Musique zen : bourdon grave + notes de bol / handpan sur une gamme pentatonique, dans une longue réverbération.
+   - Sons de nature : bruit filtré qui suit le souffle en continu (la vague arrive à l'inspiration, se retire à l'expiration).
+   - Bol chantant : un bol frappé au début de chaque inspiration (et plus doux à l'expiration). */
+let AC = null, A = null;
+const PENTA = [146.83, 174.61, 196.0, 220.0, 261.63, 293.66, 349.23, 392.0, 440.0, 523.25]; // ré mineur pentatonique
+function makeNoise(seconds, color) {
+  const len = Math.floor(AC.sampleRate * seconds), buf = AC.createBuffer(2, len, AC.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = buf.getChannelData(c); let b0 = 0, b1 = 0, b2 = 0, last = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      if (color === "brown") { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
+      else { b0 = 0.99765 * b0 + w * 0.099; b1 = 0.963 * b1 + w * 0.2965; b2 = 0.57 * b2 + w * 1.0526; d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.2; }
+    }
+  }
+  return buf;
+}
+function makeImpulse(seconds) {
+  const len = Math.floor(AC.sampleRate * seconds), buf = AC.createBuffer(2, len, AC.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+  return buf;
+}
 function audioInit() {
   if (AC) return;
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; return; }
-  const master = AC.createGain(); master.gain.value = 0.0; master.connect(AC.destination);
-  const filter = AC.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 500; filter.Q.value = 0.7; filter.connect(master);
-  const oscs = [130.81, 196.0, 261.63].map((f, i) => { const o = AC.createOscillator(); o.type = i === 0 ? "sine" : "triangle"; o.frequency.value = f; const g = AC.createGain(); g.gain.value = [0.5, 0.18, 0.1][i]; o.connect(g).connect(filter); o.start(); return o; });
-  pad = { master, filter, oscs };
-}
-function padPhase(inhale, dur) {
-  if (!AC || !pad) return;
-  const t = AC.currentTime, tc = dur / 3;
-  pad.master.gain.cancelScheduledValues(t);
-  pad.filter.frequency.cancelScheduledValues(t);
-  pad.master.gain.setTargetAtTime(S.sound ? (inhale ? 0.16 : 0.07) : 0, t, tc);
-  pad.filter.frequency.setTargetAtTime(inhale ? 1500 : 380, t, tc);
-  pad.oscs.forEach((o, i) => { const base = [130.81, 196.0, 261.63][i]; o.frequency.setTargetAtTime(base * (inhale ? 1.06 : 1), t, tc); });
-}
-function padOff() { if (AC && pad) pad.master.gain.setTargetAtTime(0, AC.currentTime, 0.4); }
-function bell(high) {
-  if (!AC || !S.bell) return;
-  const t = AC.currentTime, f = high ? 659.25 : 523.25;
-  [1, 2.76, 5.4].forEach((m, i) => {
-    const o = AC.createOscillator(), g = AC.createGain();
-    o.frequency.value = f * m; o.type = "sine";
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime([0.12, 0.04, 0.015][i], t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + [3.2, 1.6, 0.8][i]);
-    o.connect(g).connect(AC.destination); o.start(t); o.stop(t + 3.3);
+  const out = AC.createDynamicsCompressor(); out.threshold.value = -18; out.ratio.value = 3; out.connect(AC.destination);
+  const master = AC.createGain(); master.gain.value = 0; master.connect(out);
+  const verb = AC.createConvolver(); verb.buffer = makeImpulse(5.5);
+  const wet = AC.createGain(); wet.gain.value = 0.75; verb.connect(wet).connect(master);
+  // bourdon
+  const music = AC.createGain(); music.gain.value = 0; music.connect(master); music.connect(verb);
+  const droneF = AC.createBiquadFilter(); droneF.type = "lowpass"; droneF.frequency.value = 420; droneF.connect(music);
+  const droneG = AC.createGain(); droneG.gain.value = 0.05; droneG.connect(droneF);
+  [[73.42, 0], [73.42, 0.35], [110.0, -0.25], [146.83, 0.2]].forEach(([f, det], i) => {
+    const o = AC.createOscillator(); o.type = "sine"; o.frequency.value = f + det;
+    const g = AC.createGain(); g.gain.value = [0.55, 0.45, 0.3, 0.12][i]; o.connect(g).connect(droneG); o.start();
+    const lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.05 + i * 0.023; lg.gain.value = g.gain.value * 0.4;
+    lfo.connect(lg).connect(g.gain); lfo.start();
   });
+  const notes = AC.createGain(); notes.gain.value = 1; notes.connect(music);
+  // nature : deux couches de bruit filtré
+  const nature = AC.createGain(); nature.gain.value = 0; nature.connect(master);
+  const pink = makeNoise(6, "pink"), brown = makeNoise(6, "brown");
+  const src1 = AC.createBufferSource(); src1.buffer = brown; src1.loop = true;
+  const f1 = AC.createBiquadFilter(); f1.type = "lowpass"; f1.frequency.value = 400; f1.Q.value = 0.4;
+  const g1 = AC.createGain(); g1.gain.value = 0; src1.connect(f1).connect(g1).connect(nature); src1.start();
+  const src2 = AC.createBufferSource(); src2.buffer = pink; src2.loop = true; src2.loopStart = 0.5;
+  const f2 = AC.createBiquadFilter(); f2.type = "bandpass"; f2.frequency.value = 2500; f2.Q.value = 0.6;
+  const g2 = AC.createGain(); g2.gain.value = 0; src2.connect(f2).connect(g2).connect(nature); src2.start(0, 2.3);
+  // gouttes, pour le lotus
+  const bowls = AC.createGain(); bowls.gain.value = 0.9; bowls.connect(master); bowls.connect(verb);
+  A = { master, verb, music, droneG, droneF, notes, nature, f1, g1, f2, g2, bowls, nextNote: 0, nextDrop: 0, prevB: 0 };
+}
+function audioStart() {
+  if (!AC) return;
+  if (AC.state === "suspended") AC.resume();
+  const t = AC.currentTime;
+  A.master.gain.cancelScheduledValues(t); A.master.gain.setTargetAtTime(0.9, t, 1.2);
+  A.music.gain.setTargetAtTime(S.music ? 1 : 0, t, 1.5);
+  A.nature.gain.setTargetAtTime(S.nature ? 1 : 0, t, 1.5);
+  A.nextNote = t + 1.5;
+}
+function audioStop() { if (AC && A) { const t = AC.currentTime; A.master.gain.cancelScheduledValues(t); A.master.gain.setTargetAtTime(0, t, 0.8); } }
+
+// une note de handpan / bol tibétain doux : fondamentale + partiels inharmoniques, attaque feutrée, longue résonance
+function zenNote(f, vol, when) {
+  const t = when || AC.currentTime;
+  [[1, 1, 5.5], [2.0, 0.22, 3.2], [2.98, 0.08, 2.0], [4.1, 0.03, 1.2]].forEach(([m, a, d]) => {
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = "sine"; o.frequency.value = f * m;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol * a, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g).connect(A.notes); o.start(t); o.stop(t + d + 0.1);
+  });
+}
+function singingBowl(f, vol) {
+  const t = AC.currentTime;
+  [[1, 1, 9], [2.71, 0.35, 6], [5.15, 0.12, 3.5]].forEach(([m, a, d]) => {
+    [0, 0.8].forEach(beat => {
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = "sine"; o.frequency.value = f * m + beat;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol * a * 0.5, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(A.bowls); o.start(t); o.stop(t + d + 0.1);
+    });
+  });
+}
+function drop() {
+  const t = AC.currentTime, o = AC.createOscillator(), g = AC.createGain(), f = 900 + Math.random() * 900;
+  o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.9, t + 0.09);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+  o.connect(g).connect(A.bowls); o.start(t); o.stop(t + 0.2);
+}
+// début de phase : une note qui monte à l'inspiration, qui descend à l'expiration
+function audioPhase(inhale, dur) {
+  if (!AC || !A) return;
+  const t = AC.currentTime;
+  A.music.gain.setTargetAtTime(S.music ? 1 : 0, t, 0.5);
+  A.nature.gain.setTargetAtTime(S.nature ? 1 : 0, t, 0.5);
+  A.droneF.frequency.setTargetAtTime(inhale ? 650 : 380, t, dur / 3);
+  if (S.music) {
+    const pool = inhale ? PENTA.slice(4) : PENTA.slice(0, 6);
+    zenNote(pool[Math.floor(Math.random() * pool.length)], 0.11);
+    if (Math.random() < 0.55) zenNote(pool[Math.floor(Math.random() * pool.length)] * (Math.random() < 0.3 ? 2 : 1), 0.05, t + dur * (0.4 + Math.random() * 0.3));
+  }
+  if (S.bell) singingBowl(inhale ? 220 : 196, inhale ? 0.16 : 0.09);
+}
+// appelée à chaque image : la nature suit la courbe du souffle (b de 0 à 1)
+function audioFrame(b, inhale) {
+  if (!AC || !A || !S.nature) return;
+  const t = AC.currentTime, k = 0.08;
+  if (S.scene === "maree") {
+    // la vague roule et gronde quand elle monte, l'écume pétille quand elle redescend
+    A.f1.frequency.setTargetAtTime(250 + 1100 * b, t, k);
+    A.g1.gain.setTargetAtTime(0.06 + 0.32 * b, t, k);
+    A.f2.frequency.setTargetAtTime(3800, t, k); A.f2.Q.setTargetAtTime(0.5, t, k);
+    A.g2.gain.setTargetAtTime(inhale ? 0.015 + 0.02 * b : 0.02 + 0.07 * b, t, k);
+  } else if (S.scene === "aube") {
+    A.f1.frequency.setTargetAtTime(180 + 300 * b, t, k); A.g1.gain.setTargetAtTime(0.03 + 0.05 * b, t, k);
+    A.f2.frequency.setTargetAtTime(500 + 500 * b, t, k); A.f2.Q.setTargetAtTime(1.6, t, k);
+    A.g2.gain.setTargetAtTime(0.02 + 0.06 * b, t, k);
+  } else if (S.scene === "lotus") {
+    A.f1.frequency.setTargetAtTime(300 + 200 * b, t, k); A.g1.gain.setTargetAtTime(0.05, t, k);
+    A.f2.frequency.setTargetAtTime(1400, t, k); A.f2.Q.setTargetAtTime(1, t, k); A.g2.gain.setTargetAtTime(0.008 + 0.012 * b, t, k);
+    if (t > A.nextDrop) { drop(); A.nextDrop = t + 1.5 + Math.random() * 4; }
+  } else {
+    A.f1.frequency.setTargetAtTime(150 + 150 * b, t, k); A.g1.gain.setTargetAtTime(0.025 + 0.03 * b, t, k);
+    A.f2.frequency.setTargetAtTime(900 + 900 * b, t, k); A.f2.Q.setTargetAtTime(2.5, t, k);
+    A.g2.gain.setTargetAtTime(0.012 + 0.05 * b, t, k);
+  }
 }
 function say(text) {
   if (!S.voice || !("speechSynthesis" in window)) return;
@@ -416,8 +523,9 @@ function buildSeeds() {
   const pines = [];
   for (let x = -10; x < W + 10; x += 7 + r() * 9) pines.push({ x, h: H * (0.04 + r() * 0.07), w: 6 + r() * 6 });
   const motes = Array.from({ length: 46 }, () => ({ x: r(), y: r(), s: 0.6 + r() * 1.8, sp: 0.2 + r() * 0.6, p: r() * 6.28 }));
+  const piles = [[0.27, 0.635, 0.42], [0.31, 0.67, 0.52], [0.355, 0.715, 0.64], [0.41, 0.77, 0.78], [0.475, 0.835, 0.95], [0.55, 0.91, 1.15]];
   const pads = [{ x: 0.2, y: 0.83, r: 0.09 }, { x: 0.8, y: 0.78, r: 0.07 }, { x: 0.66, y: 0.92, r: 0.11 }, { x: 0.33, y: 0.95, r: 0.06 }];
-  seedData = { stars, aube, aubeHy, aurM, aurHy, pines, motes, pads };
+  seedData = { piles, stars, aube, aubeHy, aurM, aurHy, pines, motes, pads };
 }
 
 const hex = (h) => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
@@ -466,6 +574,25 @@ function drawMaree(b, t) {
     ctx.beginPath(); for (let x = 0; x <= W; x += 20) ctx.lineTo(x, y + Math.sin(x * 0.02 + i + t * 0.001) * 2); ctx.stroke();
   }
   ctx.restore(); ctx.globalAlpha = 1;
+  // ponton : l'eau grimpe le long des pieux quand la marée monte
+  const m = Math.min(W, H), pl = seedData.piles;
+  const top = pl.map(([px, py, s]) => [px * W, py * H - H * 0.13 * s]);
+  ctx.strokeStyle = "#4a3326"; ctx.lineCap = "round";
+  ctx.lineWidth = m * 0.016; ctx.beginPath(); top.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+  ctx.strokeStyle = "#7a5843"; ctx.lineWidth = m * 0.006; ctx.beginPath(); top.forEach((p, i) => i ? ctx.lineTo(p[0], p[1] - m * 0.008) : ctx.moveTo(p[0], p[1] - m * 0.008)); ctx.stroke();
+  pl.forEach(([px, py, s]) => {
+    const x = px * W, y = py * H, ph = H * 0.13 * s, pw = m * 0.016 * s;
+    ctx.fillStyle = "#3d2a20"; ctx.fillRect(x - pw / 2, y - ph, pw, ph);
+    ctx.fillStyle = "rgba(255,220,180,.18)"; ctx.fillRect(x - pw / 2, y - ph, pw * 0.3, ph);
+    const depth = Math.max(0, Math.min(1, (edge(x, b) - y) / (H * 0.2)));
+    if (depth > 0) {
+      const wl = y - ph * 0.62 * depth;
+      ctx.fillStyle = "rgba(63,125,147,.92)"; ctx.fillRect(x - pw / 2 - 1, wl, pw + 2, y - wl + 1);
+      ctx.fillStyle = "rgba(160,120,90,.35)"; ctx.fillRect(x - pw / 2, wl - ph * 0.62 * (1 - depth) * 0.5, pw, ph * 0.62 * (1 - depth) * 0.5);
+      ctx.globalAlpha = 0.85; ctx.strokeStyle = "#fbfaf4"; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.ellipse(x, wl, pw * (1.4 + 0.3 * Math.sin(t * 0.004 + px * 20)), pw * 0.35, 0, 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  });
   // écume
   ctx.lineJoin = "round";
   [[0, 0.95, 3.2], [-H * 0.012, 0.45, 2], [-H * 0.028, 0.2, 1.5]].forEach(([dy, a, lw]) => {
@@ -611,7 +738,7 @@ function releaseAwake() { try { wake && wake.release(); } catch (e) {} wake = nu
 function show(el, on) { el.classList.toggle("fade-out", !on); el.setAttribute("aria-hidden", String(!on)); }
 
 function start() {
-  audioInit(); if (AC && AC.state === "suspended") AC.resume();
+  audioInit(); audioStart();
   const cyc = S.inh + S.exh;
   totalMs = Math.max(1, Math.round(S.minutes * 60 / cyc)) * cyc * 1000;
   runMs = 0; introMs = 0; paused = false; lastPhase = null; mode = "intro";
@@ -623,7 +750,7 @@ function start() {
   keepAwake();
 }
 function stopSession(completed) {
-  padOff(); releaseAwake();
+  audioStop(); releaseAwake();
   try { speechSynthesis && speechSynthesis.cancel(); } catch (e) {}
   show($("hud"), false);
   if (completed) {
@@ -633,7 +760,7 @@ function stopSession(completed) {
     $("end-title").textContent = n >= 3 ? "Journée 365 accomplie" : "Séance terminée";
     $("end-text").textContent = `${cycles} respirations, ${S.minutes} minutes. ${n >= 3 ? "Trois séances aujourd'hui, bravo." : `Séance ${n} sur 3 aujourd'hui.`}`;
     document.querySelectorAll("#feel .chip").forEach(c => c.setAttribute("aria-pressed", "false"));
-    show($("end"), true); bell(false); say("Séance terminée. Revenez doucement.");
+    show($("end"), true); if (AC && S.bell) singingBowl(196, 0.14); say("Séance terminée. Revenez doucement.");
   } else { mode = "home"; show($("home"), true); }
 }
 function setPauseIcon() {
@@ -643,7 +770,7 @@ function setPauseIcon() {
 function togglePause() {
   if (mode !== "run" && mode !== "intro") return;
   paused = !paused; $("paused").hidden = !paused; setPauseIcon();
-  if (paused) { padOff(); try { speechSynthesis.cancel(); } catch (e) {} } else lastPhase = null;
+  if (paused) { audioStop(); try { speechSynthesis.cancel(); } catch (e) {} } else { lastPhase = null; audioStart(); }
 }
 $("start").addEventListener("click", start);
 $("pause").addEventListener("click", togglePause);
@@ -679,12 +806,14 @@ function frame(now) {
       if (ph !== lastPhase) {
         lastPhase = ph;
         const dur = st.inhale ? S.inh : S.exh;
-        padPhase(st.inhale, dur); bell(st.inhale); vibe(st.inhale);
+        audioPhase(st.inhale, dur); vibe(st.inhale);
         say(st.inhale ? "Inspirez" : "Expirez");
         $("word").textContent = st.inhale ? "Inspirez" : "Expirez";
+        $("count").dataset.sub = (SUBS[S.scene] || ["", ""])[st.inhale ? 0 : 1];
       }
       const left = Math.ceil(st.left);
-      $("count").textContent = "· ".repeat(Math.max(0, left - 1)) + "·";
+      $("count").textContent = $("count").dataset.sub + "  " + "·".repeat(Math.max(1, left));
+      audioFrame(st.b, st.inhale);
       $("cue").style.visibility = S.text ? "visible" : "hidden";
       $("time").textContent = fmtClock(totalMs - runMs);
       $("bar").style.width = `${Math.min(100, runMs / totalMs * 100)}%`;

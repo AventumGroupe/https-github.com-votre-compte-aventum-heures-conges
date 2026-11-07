@@ -445,14 +445,30 @@ function logSession() {
    Le moteur audio travaille avec une grande mémoire tampon (latencyHint "playback") pour ne pas
    être perturbé par l'animation. */
 let AC = null, A = null;
-const NOTES = [293.66, 349.23, 392.0, 440.0, 523.25, 587.33]; // ré, fa, sol, la, do, ré : pentatonique
+const NOTES = [587.33, 698.46, 783.99, 880.0, 1046.5, 1174.66]; // ré, fa, sol, la, do, ré (pentatonique, registre audible sur un téléphone)
 function glide(param, value, tc) {
   const t = AC.currentTime;
   if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(t); else { const v = param.value; param.cancelScheduledValues(t); param.setValueAtTime(v, t); }
   param.setTargetAtTime(value, t, tc);
 }
 function audioAlive() { if (AC && AC.state !== "running" && AC.state !== "closed") { try { AC.resume(); } catch (e) {} } }
+function unmuteIOS() {
+  try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+  try {
+    if (!window.__silence) {
+      // quelques millisecondes de silence en boucle dans une balise audio : iOS passe alors en mode « lecture » et ignore le bouton silencieux
+      const sr = 8000, n = 800, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+      const w = (o, str) => [...str].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+      w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+      const el = document.createElement("audio"); el.src = URL.createObjectURL(new Blob([buf], { type: "audio/wav" })); el.loop = true; el.setAttribute("playsinline", ""); el.volume = 0.01;
+      window.__silence = el;
+    }
+    const pr = window.__silence.play(); if (pr && pr.catch) pr.catch(() => {});
+  } catch (e) {}
+}
 function audioInit() {
+  unmuteIOS();
   if (AC) return;
   const Ctx = window.AudioContext || window.webkitAudioContext;
   try { AC = new Ctx({ latencyHint: "playback" }); } catch (e) { try { AC = new Ctx(); } catch (e2) { AC = null; return; } }
@@ -467,20 +483,25 @@ function audioInit() {
   });
   // accord tenu : ré, la, ré (deux voix très légèrement désaccordées pour un battement lent)
   const drone = AC.createGain(); drone.gain.value = 0; drone.connect(master);
-  [[146.83, 0.5], [147.08, 0.35], [220.0, 0.28], [293.66, 0.12]].forEach(([f, g]) => {
-    const o = AC.createOscillator(), og = AC.createGain(); o.type = "sine"; o.frequency.value = f; og.gain.value = g;
-    o.connect(og); og.connect(drone); o.start();
+  // voix médiums (ré, la, ré) : les petits haut-parleurs ne restituent presque rien sous 300 Hz
+  const warm = AC.createBiquadFilter(); warm.type = "lowpass"; warm.frequency.value = 1400; warm.connect(drone);
+  [[146.83, 0.10, "sine"], [293.66, 0.45, "triangle"], [294.1, 0.30, "sine"], [440.0, 0.32, "triangle"], [587.33, 0.16, "sine"]].forEach(([f, g, type], i) => {
+    const o = AC.createOscillator(), og = AC.createGain(); o.type = type; o.frequency.value = f; og.gain.value = g;
+    const lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.07 + i * 0.031; lg.gain.value = g * 0.3;
+    lfo.connect(lg); lg.connect(og.gain); lfo.start();
+    o.connect(og); og.connect(warm); o.start();
   });
+  drone.connect(send);
   const notes = AC.createGain(); notes.gain.value = 1; notes.connect(master); notes.connect(send);
   A = { master, drone, notes };
 }
 function audioLevel() {
   if (!AC || !A) return;
   const on = S.son !== 0 && (mode === "run" || mode === "intro") && !paused;
-  glide(A.master.gain, on ? Math.pow(S.vol / 100, 1.6) : 0, on ? 0.6 : 0.4);
+  glide(A.master.gain, on ? 1.5 * S.vol / 100 : 0, on ? 0.6 : 0.4);
   if (!wantsMusic()) glide(A.drone.gain, 0, 0.5);
 }
-function audioStart() { if (!AC) return; audioAlive(); audioLevel(); if (wantsMusic()) glide(A.drone.gain, 0.05, 1.5); }
+function audioStart() { if (!AC) return; audioAlive(); audioLevel(); if (wantsMusic()) glide(A.drone.gain, 0.14, 1.5); }
 function audioStop() { if (AC && A) glide(A.master.gain, 0, 0.8); }
 function tone(f, vol, when, decay, partial) {
   const t = Math.max(when || 0, AC.currentTime);
@@ -505,13 +526,12 @@ function audioPhase(inhale, dur) {
   if (!AC || !A) return;
   audioAlive();
   if (wantsMusic()) {
-    glide(A.drone.gain, inhale ? 0.11 : 0.04, dur / 2.5);
-    if (Math.random() < 0.6) {
-      const pool = inhale ? NOTES.slice(2) : NOTES.slice(0, 4);
-      tone(pool[Math.floor(Math.random() * pool.length)], 0.06, AC.currentTime + 0.3, 5);
-    }
+    glide(A.drone.gain, inhale ? 0.26 : 0.12, dur / 2.5);
+    const pool = inhale ? NOTES.slice(2) : NOTES.slice(0, 4);
+    tone(pool[Math.floor(Math.random() * pool.length)], 0.16, AC.currentTime + 0.3, 5, 0.2);
+    if (Math.random() < 0.4) tone(pool[Math.floor(Math.random() * pool.length)], 0.09, AC.currentTime + dur * 0.55, 4, 0.2);
   }
-  if (wantsBowl()) singingBowl(inhale ? 220 : 196, inhale ? 0.14 : 0.08);
+  if (wantsBowl()) singingBowl(inhale ? 440 : 392, inhale ? 0.3 : 0.18);
 }
 function say(text) {
   if (S.guide !== 2 || !("speechSynthesis" in window)) return;
@@ -827,7 +847,7 @@ function stopSession(completed) {
     $("end-title").textContent = n >= 3 ? "Journée 365 accomplie" : "Séance terminée";
     $("end-text").textContent = `${cycles} respirations, ${S.minutes} minutes. ${n >= 3 ? "Trois séances aujourd'hui, bravo." : `Séance ${n} sur 3 aujourd'hui.`}`;
     document.querySelectorAll("#feel .chip").forEach(c => c.setAttribute("aria-pressed", "false"));
-    show($("end"), true); if (AC && wantsBowl()) { glide(A.master.gain, Math.pow(S.vol / 100, 1.6), 0.2); singingBowl(196, 0.12); setTimeout(audioStop, 6000); } say("Séance terminée. Revenez doucement.");
+    show($("end"), true); if (AC && wantsBowl()) { glide(A.master.gain, 1.5 * S.vol / 100, 0.2); singingBowl(392, 0.25); setTimeout(audioStop, 6000); } say("Séance terminée. Revenez doucement.");
   } else { mode = "home"; show($("home"), true); }
 }
 function setPauseIcon() {

@@ -43,6 +43,30 @@ function closure(id, predIds, succIds) {
   return { desc, anc };
 }
 
+/**
+ * Remplace temporairement une liste déroulante par un champ « nom + ✓ »
+ * (les fenêtres prompt() du navigateur sont bloquées dans certains contextes).
+ */
+function inlineNew(select, placeholder, onOk, done) {
+  const row = document.createElement('div');
+  row.className = 'inline-new';
+  row.innerHTML = `<input type="text" placeholder="${esc(placeholder)}" aria-label="${esc(placeholder)}" autocomplete="off">
+    <button type="button" class="btn primary sm" data-ok aria-label="Créer">${icon('check', 16)}</button>
+    <button type="button" class="icon-btn xs" data-no aria-label="Annuler">${icon('close', 14)}</button>`;
+  select.hidden = true;
+  select.after(row);
+  const inp = row.querySelector('input');
+  inp.focus();
+  const close = () => { row.remove(); select.hidden = false; done?.(); };
+  const ok = () => { const v = inp.value.trim(); if (!v) { inp.focus(); return; } onOk(v); close(); };
+  row.querySelector('[data-ok]').addEventListener('click', (e) => { e.stopPropagation(); ok(); });
+  row.querySelector('[data-no]').addEventListener('click', (e) => { e.stopPropagation(); close(); });
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); ok(); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+  });
+}
+
 export function openTaskEditor(idOrPreset = null) {
   const existing = typeof idOrPreset === 'string' ? db.tasks[idOrPreset] : null;
   const isNew = !existing;
@@ -274,9 +298,8 @@ export function openTaskEditor(idOrPreset = null) {
     else if (f === 'delegate') d.delegate = t.value || null;
     else if (f === 'projectId') {
       if (t.value === '__new') {
-        const name = prompt('Nom du nouveau projet');
-        if (name?.trim()) { const p = newProject({ name: name.trim() }); putProject(p); d.projectId = p.id; }
-        t.innerHTML = `<option value="">Sans projet</option>${projects().map((p) => `<option value="${p.id}" ${d.projectId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="__new">＋ Nouveau projet…</option>`;
+        const refill = () => { t.innerHTML = `<option value="">Sans projet</option>${projects().map((p) => `<option value="${p.id}" ${d.projectId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="__new">＋ Nouveau projet…</option>`; };
+        inlineNew(t, 'Nom du nouveau projet', (name) => { const p = newProject({ name }); putProject(p); d.projectId = p.id; toast(`Projet « ${name} » créé.`); }, refill);
       } else d.projectId = t.value || null;
     } else if (t.matches('[data-addpred]') && t.value) {
       d.preds.push({ id: t.value, lag: 0 }); part('deps', depsHtml());
@@ -285,8 +308,8 @@ export function openTaskEditor(idOrPreset = null) {
     } else if (t.matches('[data-addres]') && t.value) {
       if (t.value.startsWith('__new:')) {
         const type = t.value.slice(6);
-        const name = prompt(`Nom (${RES_TYPES[type].label.toLowerCase()})`);
-        if (name?.trim()) { const r = newResource({ name: name.trim(), type }); putResource(r); d.assign.push({ id: r.id, qty: null }); }
+        inlineNew(t, `Nom (${RES_TYPES[type].label.toLowerCase()})`, (name) => { const r = newResource({ name, type }); putResource(r); d.assign.push({ id: r.id, qty: null }); }, () => part('res', resHtml()));
+        return;
       } else d.assign.push({ id: t.value, qty: null });
       part('res', resHtml());
     } else if (t.dataset.subdone) {

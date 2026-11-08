@@ -858,3 +858,5 @@ body[data-view="reglages"] .fab, body[data-view="ressources"] .fab { display: no
   .toolbar:not(.more) .search { flex: 1 1 auto; min-width: 0; }
   .toolbar:not(.more) select { flex: 0 1 auto; width: 112px; }
 }
+.inline-new { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.inline-new input { flex: 1; min-width: 0; }

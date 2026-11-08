@@ -58,11 +58,16 @@ Au démarrage, puis toutes les 10 minutes, l'application cherche les tâches non
 
 Ses successeurs sont décalés à leur tour. Les tâches qui dépassent alors leur échéance passent en rouge. Ce report peut être désactivé dans les réglages.
 
-## Synchronisation téléphone ↔ ordinateur (GitHub)
+## Synchronisation Microsoft 365 (Exchange)
 
-Les données sont copiées dans le fichier `plannings.json` d'un **dépôt GitHub privé** (par défaut `AventumGroupe/plannings-donnees`). L'APK et la version web le lisent et l'écrivent : mêmes données partout, fusion élément par élément (le plus récent gagne), historique conservé par GitHub.
+Une seule connexion, votre compte Microsoft 365 :
+- tâches **avec une heure précise** → rendez-vous dans l'**agenda Outlook** (avec rappel) ;
+- **autres tâches** → liste **« Plannings »** de Microsoft To Do / Tâches Outlook (échéance, statut, importance, rappel) ;
+- projets, ressources et réglages → données invisibles attachées à cette liste.
 
-Mise en place sur chaque appareil : *Réglages → Téléphone ↔ ordinateur*, coller une clé d'accès GitHub « fine-grained » limitée au dépôt de données, avec la permission **Contents : Read and write** (création : github.com/settings/personal-access-tokens/new). Ne jamais utiliser le dépôt public du code pour les données.
+Chaque élément Exchange porte la fiche complète de la tâche : le téléphone (APK) et l'ordinateur (web) partagent les mêmes données. Les modifications faites dans Outlook ou To Do (titre, date, statut, suppression) reviennent dans l'application. Synchronisation automatique à l'ouverture, 5 s après une modification, toutes les 2 minutes et au retour du réseau.
+
+Inscription de l'application (une fois, par un administrateur Microsoft 365) : Entra ID → Inscriptions d'applications → Nouvelle ; comptes de tout annuaire organisationnel et comptes personnels ; plateforme **SPA** avec les URI `https://aventumgroupe.github.io/plannings/` et `https://localhost/` (APK) ; autorisations déléguées Graph `User.Read`, `Calendars.ReadWrite`, `Tasks.ReadWrite` + consentement administrateur.
 
 ## Application Android (APK)
 

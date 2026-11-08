@@ -1,0 +1,7 @@
+{
+  "appId": "com.aventum.plannings",
+  "appName": "Plannings",
+  "webDir": "www",
+  "backgroundColor": "#f4f6f9",
+  "android": { "allowMixedContent": false }
+}

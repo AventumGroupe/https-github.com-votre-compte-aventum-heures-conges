@@ -338,7 +338,9 @@ async function start() {
 
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvent = e; if (current === 'reglages') render(); });
 
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+// Dans l'application Android (Capacitor), les fichiers sont déjà embarqués : pas de service worker.
+const isNativeApp = !!window.Capacitor?.isNativePlatform?.();
+if ('serviceWorker' in navigator && location.protocol !== 'file:' && !isNativeApp) {
   navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service worker', e));
 }
 

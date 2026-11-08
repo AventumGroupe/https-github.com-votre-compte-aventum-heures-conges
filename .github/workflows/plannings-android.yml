@@ -31,6 +31,9 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      # Met en cache Gradle entre deux constructions (moins de téléchargements).
+      - uses: gradle/actions/setup-gradle@v4
+
       - name: Installer les dépendances
         run: npm ci || npm install
 
@@ -45,9 +48,15 @@ jobs:
 
       - name: Construire l'APK
         working-directory: gestion-plannings/android
+        # Jusqu'à 3 tentatives : les téléchargements de Gradle échouent parfois (erreurs réseau passagères).
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          for i in 1 2 3; do
+            ./gradlew assembleRelease --no-daemon && exit 0
+            echo "Tentative $i échouée, nouvel essai dans 30 s…"
+            sleep 30
+          done
+          exit 1
 
       - name: Renommer l'APK
         run: |

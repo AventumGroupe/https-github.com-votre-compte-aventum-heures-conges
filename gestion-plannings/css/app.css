@@ -783,3 +783,78 @@ label.icon-btn { cursor: pointer; }
   .sld.compact:not(:has(.sld-top)) { width: 150px; }
   .cal-toolbar .sld.compact { order: 4; }
 }
+
+/* =====================================================================
+   v1.2 : un seul bouton « + », cartographie en 6 catégories
+   ===================================================================== */
+:root {
+  --c-priorite: var(--danger);
+  --c-deleguer: var(--warn);
+  --c-cote: var(--muted);
+  --c-planifier: var(--accent);
+  --c-collaborer: var(--e1);
+  --c-reste: var(--surface-3);
+}
+.c-priorite { --cc: var(--c-priorite); }
+.c-deleguer { --cc: var(--c-deleguer); }
+.c-cote { --cc: var(--c-cote); }
+.c-planifier { --cc: var(--c-planifier); }
+.c-collaborer { --cc: var(--c-collaborer); }
+.c-reste { --cc: var(--c-reste); }
+.task-row[class*="c-"] { border-left-color: var(--cc); }
+.grp-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cc); flex: none; display: inline-block; }
+
+/* Bouton flottant unique, sur toutes les tailles d'écran */
+.fab {
+  display: grid; place-items: center; position: fixed; z-index: 25;
+  right: max(24px, env(safe-area-inset-right)); bottom: calc(24px + var(--bottombar) + env(safe-area-inset-bottom));
+  width: 60px; height: 60px; border-radius: 20px; border: 0; background: var(--accent); color: var(--accent-ink);
+  box-shadow: var(--shadow-lg); cursor: pointer; transition: transform .15s;
+}
+.fab:hover { transform: scale(1.05); }
+body[data-view="reglages"] .fab, body[data-view="ressources"] .fab { display: none; }
+.list-view { padding-bottom: 110px; }
+
+/* Liste groupée */
+.grp { margin-bottom: 14px; }
+.grp-head { display: flex; align-items: center; gap: 8px; padding: 8px 4px; cursor: pointer; user-select: none; }
+.grp-head b { font-size: .95rem; }
+.grp-head .caret { margin-left: auto; }
+.grp.c-cote .tasks, .grp.c-reste .tasks { opacity: .8; }
+
+/* Cartographie */
+.map { display: grid; gap: 10px; }
+.map-cols, .map-row { display: grid; grid-template-columns: 92px 1fr 1fr; gap: 10px; align-items: stretch; }
+.map-cols span { font-size: .78rem; font-weight: 650; color: var(--muted); display: flex; align-items: center; gap: 4px; padding-left: 4px; }
+.map-lab { font-size: .76rem; font-weight: 650; color: var(--muted); display: flex; align-items: center; line-height: 1.25; }
+.map .span2 { grid-column: span 2; display: grid; }
+.cell { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--cc); border-radius: var(--radius); padding: 10px; min-width: 0; }
+.cell header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.cell header b { font-size: .86rem; color: var(--cc); }
+.c-cote.cell header b, .c-reste.cell header b { color: var(--muted); }
+.cell .mini { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.cell .mini li { display: flex; align-items: center; gap: 7px; padding: 6px; border-radius: 8px; cursor: pointer; font-size: .86rem; }
+.cell .mini li:hover { background: var(--surface-2); }
+.cell .mini li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell .mini li small { color: var(--muted); font-weight: 700; }
+.cell .mini li.done span { text-decoration: line-through; color: var(--muted); }
+
+/* Catégorie en direct dans la fiche */
+.cat-live { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; margin: 4px 0 6px; border-radius: 10px; background: color-mix(in srgb, var(--cc) 12%, var(--surface)); }
+.cat-live b { color: var(--cc); font-size: .9rem; }
+.c-reste.cat-live b, .c-cote.cat-live b { color: var(--muted); }
+.cat-live span { font-size: .8rem; color: var(--muted); }
+
+@media (max-width: 760px) {
+  .fab { right: max(16px, env(safe-area-inset-right)); bottom: calc(var(--bottombar) + 16px); width: 56px; height: 56px; border-radius: 18px; }
+  body[data-view="calendrier"] .fab { bottom: calc(var(--bottombar) + 64px); }
+  .map-cols, .map-row { grid-template-columns: 1fr 1fr; }
+  .map-cols span:first-child { display: none; }
+  .map-lab { grid-column: 1 / -1; margin-top: 4px; }
+  .cat-live span { display: none; }
+}
+@media (max-width: 760px) {
+  .toolbar:not(.more) { flex-wrap: nowrap; }
+  .toolbar:not(.more) .search { flex: 1 1 auto; min-width: 0; }
+  .toolbar:not(.more) select { flex: 0 1 auto; width: 112px; }
+}

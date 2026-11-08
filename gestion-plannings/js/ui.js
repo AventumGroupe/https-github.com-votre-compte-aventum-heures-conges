@@ -124,7 +124,7 @@ export const resName = (id) => db.resources[id]?.name || '';
 
 // ---------- Bulles d'information (bouton « i ») ----------
 export const INFO = {
-  criteres: `<b>Urgence</b> : 1 pas du tout → 5 très.<br><b>Importance</b> : 1 pas du tout → 5 très.<br><b>Énergie</b> : 1 plombant → 4 dynamisant.<br><br>Score de priorité = importance × 2 + urgence.`,
+  criteres: `<b>Urgence</b> 1→5 · <b>Importance</b> 1→5 · <b>Énergie</b> 1 plombant → 4 dynamisant.<br><br>Urgent et important + dynamisant : <b>priorité</b> ; + plombant : <b>déléguer ou automatiser</b>.<br>Urgent seulement : <b>laisser de côté</b>.<br>Important seulement + dynamisant : <b>à planifier</b> ; + plombant : <b>planifier avec un collaborateur</b>.<br><br>« Urgent » ou « important » = 4 ou 5.`,
   energie: `<b>1 Plombant</b> : vide l’énergie, à faire le matin ou à déléguer.<br><b>2 Fatigant</b> : demande un effort.<br><b>3 Stimulant</b> : plutôt agréable.<br><b>4 Dynamisant</b> : recharge les batteries.`,
   propositions: `L’application ne planifie jamais seule : elle propose. Les tâches plombantes vont plutôt le matin ou sont à déléguer. « ✕ » masque une proposition pendant 7 jours.`,
   matrice: `Urgent et important : <b>faire</b>. Important : <b>planifier</b>. Urgent : <b>déléguer</b>. Ni l’un ni l’autre : <b>plus tard</b>.`,

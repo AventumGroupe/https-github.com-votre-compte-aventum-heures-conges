@@ -21,11 +21,14 @@ export const RES_TYPES = {
   budget: { label: 'Budget', plural: 'Budgets', unit: '€' },
   materiel: { label: 'Matériel', plural: 'Matériel', unit: 'u.' },
 };
-export const QUADRANTS = {
-  faire: { label: 'Faire maintenant', hint: 'Urgent et important' },
-  planifier: { label: 'Planifier', hint: 'Important, pas urgent' },
-  deleguer: { label: 'Déléguer', hint: 'Urgent, peu important' },
-  plustard: { label: 'Plus tard', hint: 'Ni urgent ni important' },
+/** Cartographie : urgence × importance × énergie (ordre d'affichage). */
+export const CATEGORIES = {
+  priorite: { label: 'Priorités', hint: 'Urgentes, importantes et dynamisantes : à faire en premier.', short: 'Priorité' },
+  deleguer: { label: 'Déléguer ou automatiser', hint: 'Urgentes et importantes, mais plombantes : à confier ou à automatiser.', short: 'À déléguer' },
+  cote: { label: 'Laisser de côté', hint: 'Urgentes mais peu importantes, qu’elles dynamisent ou plombent.', short: 'De côté' },
+  planifier: { label: 'À planifier', hint: 'Importantes, pas urgentes, dynamisantes : à placer dans l’agenda.', short: 'À planifier' },
+  collaborer: { label: 'Planifier avec un collaborateur', hint: 'Importantes, pas urgentes, plombantes : à planifier dans le temps et à confier.', short: 'Avec un collaborateur' },
+  reste: { label: 'Le reste', hint: 'Ni urgentes ni importantes.', short: 'Le reste' },
 };
 export const PROJECT_COLORS = ['#3b6fe0', '#2fa37a', '#d9792b', '#b5489a', '#7a5fd1', '#c8a52a', '#2a9bb5', '#d14b4b'];
 
@@ -100,9 +103,15 @@ export const resources = () => Object.values(db.resources).sort((a, b) => a.name
 export const people = () => resources().filter((r) => r.type === 'personne');
 
 export const score = (t) => t.importance * 2 + t.urgency; // de 3 à 15
-export function quadrant(t) {
-  const u = t.urgency >= 4, i = t.importance >= 4;
-  return u && i ? 'faire' : i ? 'planifier' : u ? 'deleguer' : 'plustard';
+export const isUrgent = (t) => t.urgency >= 4;
+export const isImportant = (t) => t.importance >= 4;
+export const isEnergizing = (t) => t.energy >= 3;
+export function category(t) {
+  const u = isUrgent(t), i = isImportant(t), e = isEnergizing(t);
+  if (u && i) return e ? 'priorite' : 'deleguer';
+  if (u) return 'cote';
+  if (i) return e ? 'planifier' : 'collaborer';
+  return 'reste';
 }
 
 /** Date de dernière modification, y compris les métadonnées Outlook (pour la fusion). */

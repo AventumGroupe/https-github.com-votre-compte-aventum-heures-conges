@@ -2,7 +2,7 @@
 
 import {
   db, tasks, projects, resources, people, newTask, putTask, removeTask, save, newProject, putProject,
-  newResource, putResource, STATUS, ENERGY, RES_TYPES,
+  newResource, putResource, STATUS, ENERGY, RES_TYPES, category, CATEGORIES,
 } from './store.js';
 import { tStart, tEnd, setSpan, shiftTo, requiredStart, propagate, succsOf, completeTask, proposeSlot, RECUR } from './sched.js';
 import { openDialog, confirmDialog, toast, slider, bindSliders, info, LV, EN } from './ui.js';
@@ -160,6 +160,7 @@ export function openTaskEditor(idOrPreset = null) {
         ${slider('energy', { label: 'Énergie', ...EN, value: d.energy, kind: 'energy', infoKey: 'energie' })}
         ${slider('status', { label: 'Statut', values: st, labels: st.map((k) => STATUS[k]), value: d.status, ticks: 'labels', kind: 'status' })}
       </div>
+      <div class="cat-live c-${category(d)}" data-cat-live><i class="grp-dot"></i><b>${CATEGORIES[category(d)].label}</b><span>${CATEGORIES[category(d)].hint}</span></div>
       <div class="grid2">
         <label class="field"><span>Projet</span>
           <select data-f="projectId"><option value="">Sans projet</option>${projects().map((p) => `<option value="${p.id}" ${d.projectId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
@@ -211,7 +212,12 @@ export function openTaskEditor(idOrPreset = null) {
   }
 
   bindSliders(body, (name, v, final) => {
-    if (name === 'urgency' || name === 'importance' || name === 'energy') d[name] = Number(v);
+    if (name === 'urgency' || name === 'importance' || name === 'energy') {
+      d[name] = Number(v);
+      const c = category(d), box = body.querySelector('[data-cat-live]');
+      box.className = `cat-live c-${c}`;
+      box.innerHTML = `<i class="grp-dot"></i><b>${CATEGORIES[c].label}</b><span>${CATEGORIES[c].hint}</span>`;
+    }
     else if (name === 'status') d.status = v;
     else if (name === 'reminder') d.reminder = v;
     else if (name === 'estimate') {

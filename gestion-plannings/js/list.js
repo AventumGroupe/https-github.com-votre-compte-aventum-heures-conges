@@ -1,6 +1,6 @@
 // Écran principal : la liste des tâches, la saisie rapide et les propositions.
 
-import { db, tasks, projects, newTask, putTask, removeTask, save, local, score, quadrant, QUADRANTS, ENERGY, people } from './store.js';
+import { db, tasks, projects, newTask, putTask, removeTask, save, local, score, category, CATEGORIES, ENERGY, people } from './store.js';
 import { analyze, completeTask, propagate } from './sched.js';
 import { suggestions, dismiss } from './suggest.js';
 import { openTaskEditor } from './editor.js';
@@ -8,9 +8,8 @@ import { slider, bindSliders, info, LV, EN, energyChip, levelChip, projectChip, 
 import { esc, icon, toDateStr } from './util.js';
 
 const F = Object.assign({ status: 'open', project: '', energy: '', q: '', sort: 'score', mode: 'list', sugg: true }, local.get('listFilters', {}));
-const Q = Object.assign({ urgency: 3, importance: 3, energy: 3 }, local.get('quick', {}));
 const activeFilters = () => [F.project, F.energy, F.sort !== 'score' ? 1 : ''].filter(Boolean).length;
-const persist = () => { local.set('listFilters', F); local.set('quick', Q); };
+const persist = () => { local.set('listFilters', F); };
 
 function filtered() {
   const q = F.q.trim().toLowerCase();
@@ -49,7 +48,7 @@ function row(t, an) {
   else if (a.critical) flags.push(`<span class="badge warn" title="Sur le chemin critique : aucune marge">Chemin critique</span>`);
   if (t.slips) flags.push(`<span class="badge muted" title="Reportée automatiquement">Reportée ×${t.slips}</span>`);
   return `
-    <li class="task-row q-${quadrant(t)} ${t.status === 'done' ? 'done' : ''} ${a.late ? 'is-late' : ''}" data-id="${t.id}">
+    <li class="task-row c-${category(t)} ${t.status === 'done' ? 'done' : ''} ${a.late ? 'is-late' : ''}" data-id="${t.id}">
       <button class="check ${t.status}" data-check aria-label="${t.status === 'done' ? 'Marquer à faire' : 'Marquer comme faite'}">${icon('check', 16)}</button>
       <div class="tr-main" data-open>
         <div class="tr-title">${esc(t.title)}${t.status === 'doing' ? ' <span class="badge accent">En cours</span>' : ''}</div>
@@ -97,12 +96,39 @@ function suggestionsHtml(an) {
     </section>`;
 }
 
-function matrixHtml(list, an) {
-  return `<div class="matrix">${Object.entries(QUADRANTS).map(([k, q]) => {
-    const items = list.filter((t) => quadrant(t) === k);
-    return `<section class="quad q-${k}"><header><b>${q.label}</b><small>${q.hint}</small><span class="count">${items.length}</span></header>
-      <ul class="tasks">${items.map((t) => row(t, an)).join('') || '<li class="empty-sm">—</li>'}</ul></section>`;
-  }).join('')}</div>`;
+const collapsedCats = local.get('collapsedCats', { reste: true });
+
+function groupsHtml(list, an) {
+  return Object.entries(CATEGORIES).map(([k, c]) => {
+    const items = list.filter((t) => category(t) === k);
+    if (!items.length) return '';
+    const closed = collapsedCats[k];
+    return `<section class="grp c-${k}">
+      <header class="grp-head" data-cat="${k}">
+        <i class="grp-dot"></i><b>${c.label}</b><span class="count">${items.length}</span>${info('', c.hint)}
+        <span class="caret ${closed ? '' : 'open'}">${icon('chevR', 14)}</span>
+      </header>
+      ${closed ? '' : `<ul class="tasks">${items.map((t) => row(t, an)).join('')}</ul>`}
+    </section>`;
+  }).join('');
+}
+
+function mapHtml(list, an) {
+  const cell = (k) => {
+    const items = list.filter((t) => category(t) === k);
+    const c = CATEGORIES[k];
+    return `<section class="cell c-${k}">
+      <header><b>${c.label}</b><span class="count">${items.length}</span>${info('', c.hint)}</header>
+      <ul class="mini">${items.map((t) => `<li data-open-id="${t.id}" class="${t.status === 'done' ? 'done' : ''}"><i class="edot e${t.energy}"></i><span>${esc(t.title)}</span><small>${score(t)}</small></li>`).join('') || '<li class="muted">—</li>'}</ul>
+    </section>`;
+  };
+  return `<div class="map">
+    <div class="map-cols"><span></span><span>${icon('sun', 14)} Dynamisantes</span><span>Plombantes</span></div>
+    <div class="map-row"><span class="map-lab">Urgentes<br>importantes</span>${cell('priorite')}${cell('deleguer')}</div>
+    <div class="map-row"><span class="map-lab">Importantes</span>${cell('planifier')}${cell('collaborer')}</div>
+    <div class="map-row"><span class="map-lab">Urgentes</span><div class="span2">${cell('cote')}</div></div>
+    <div class="map-row"><span class="map-lab">Ni l’un<br>ni l’autre</span><div class="span2">${cell('reste')}</div></div>
+  </div>`;
 }
 
 let lastSuggestions = [];
@@ -119,19 +145,6 @@ export function renderList(el) {
   const root = el.firstChild;
   root.innerHTML = `
     <section class="view list-view">
-      <form class="card quick" data-quick autocomplete="off">
-        <div class="quick-line">
-          <input type="text" name="title" placeholder="Nouvelle tâche…" aria-label="Nouvelle tâche" enterkeyhint="done">
-          <button type="button" class="icon-btn" data-details title="Fiche complète">${icon('settings', 20)}</button>
-          <button class="btn primary" type="submit" aria-label="Ajouter">${icon('plus', 18)}<span class="hide-sm">Ajouter</span></button>
-        </div>
-        <div class="quick-crit">
-          ${slider('urgency', { label: 'Urgence', ...LV, value: Q.urgency, kind: 'heat', compact: true })}
-          ${slider('importance', { label: 'Importance', ...LV, value: Q.importance, kind: 'heat', compact: true })}
-          ${slider('energy', { label: 'Énergie', ...EN, value: Q.energy, kind: 'energy', compact: true })}
-          ${info('criteres')}
-        </div>
-      </form>
 
       ${suggestionsHtml(an)}
 
@@ -146,9 +159,8 @@ export function renderList(el) {
         <button class="icon-btn filt ${F.more ? 'on' : ''}" data-more title="Filtres et tri" aria-expanded="${F.more}">${icon('filter', 18)}${activeFilters() ? `<i class="dotn">${activeFilters()}</i>` : ''}</button>
         <div class="seg sm mode" role="group" aria-label="Affichage">
           <button class="seg-opt ${F.mode === 'list' ? 'on' : ''}" data-mode="list" title="Liste">${icon('list', 16)}</button>
-          <button class="seg-opt ${F.mode === 'matrix' ? 'on' : ''}" data-mode="matrix" title="Matrice urgence / importance">${icon('grid', 16)}</button>
+          <button class="seg-opt ${F.mode === 'matrix' ? 'on' : ''}" data-mode="matrix" title="Cartographie urgence · importance · énergie">${icon('grid', 16)}</button>
         </div>
-        ${F.mode === 'matrix' ? info('matrice') : ''}
       </div>
       ${F.more ? `<div class="toolbar more">
         <select data-filter="project" aria-label="Projet">
@@ -170,7 +182,7 @@ export function renderList(el) {
         </select>
       </div>` : ''}
 
-      ${list.length === 0 ? emptyHtml(all.length) : F.mode === 'matrix' ? matrixHtml(list, an) : `<ul class="tasks">${list.map((t) => row(t, an)).join('')}</ul>`}
+      ${list.length === 0 ? emptyHtml(all.length) : F.mode === 'matrix' ? mapHtml(list, an) : groupsHtml(list, an)}
     </section>`;
 
   bind(root, el);
@@ -179,28 +191,10 @@ export function renderList(el) {
 function emptyHtml(total) {
   return total
     ? `<div class="empty"><p>Aucune tâche pour ces filtres.</p></div>`
-    : `<div class="empty"><h3>Aucune tâche</h3><p>Saisissez-en une ci-dessus ${info('criteres')}</p></div>`;
+    : `<div class="empty"><h3>Aucune tâche</h3><p>Touchez ＋ pour en créer une ${info('criteres')}</p></div>`;
 }
 
 function bind(root, el) {
-  const form = root.querySelector('[data-quick]');
-  bindSliders(form, (name, v) => { Q[name] = Number(v); persist(); });
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const title = form.title.value.trim();
-    if (!title) { form.title.focus(); return; }
-    const t = newTask({ title, urgency: Q.urgency, importance: Q.importance, energy: Q.energy });
-    if (F.project && F.project !== '_none') t.projectId = F.project;
-    form.title.value = '';
-    putTask(t);
-    toast(`« ${title} » ajoutée`, { action: { label: 'Détails', run: () => openTaskEditor(t.id) } });
-    setTimeout(() => document.querySelector('[data-quick] input[name="title"]')?.focus(), 0);
-  });
-  form.querySelector('[data-details]').onclick = () => {
-    const title = form.title.value.trim();
-    openTaskEditor({ title, urgency: Q.urgency, importance: Q.importance, energy: Q.energy, projectId: F.project && F.project !== '_none' ? F.project : null });
-  };
-
   root.querySelectorAll('[data-sgsel]').forEach((sel) => sel.addEventListener('change', () => {
     const s = lastSuggestions[Number(sel.dataset.sgsel)]; const a = s?.actions[Number(sel.value)];
     if (a?.run) { a.run(); toast('C’est noté.'); }
@@ -216,6 +210,10 @@ function bind(root, el) {
   root.addEventListener('click', (e) => {
     const m = e.target.closest('[data-mode]');
     if (m) { F.mode = m.dataset.mode; persist(); renderList(el); return; }
+    const cat = e.target.closest('[data-cat]');
+    if (cat && !e.target.closest('.info')) { collapsedCats[cat.dataset.cat] = !collapsedCats[cat.dataset.cat]; local.set('collapsedCats', collapsedCats); renderList(el); return; }
+    const mo = e.target.closest('[data-open-id]');
+    if (mo) { openTaskEditor(mo.dataset.openId); return; }
     if (e.target.closest('[data-more]')) { F.more = !F.more; persist(); renderList(el); return; }
     if (e.target.closest('[data-toggle-sugg]')) { F.sugg = !F.sugg; persist(); renderList(el); return; }
     const sga = e.target.closest('[data-sga]');

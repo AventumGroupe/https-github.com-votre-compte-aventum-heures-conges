@@ -12,7 +12,7 @@ import { notifSupported, notifEnabled, enableNotifications, disableNotifications
 import { toast, confirmDialog, slider, bindSliders, info } from './ui.js';
 import { $, esc, icon, debounce, download, toLocal, toDateStr, addDays, startOfDay, fmt } from './util.js';
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 const TABS = [
   { id: 'taches', label: 'Tâches', icon: 'list', render: renderList },
   { id: 'calendrier', label: 'Calendrier', icon: 'calendar', render: renderCalendar },
@@ -67,7 +67,6 @@ function shell() {
       <nav class="tabs" aria-label="Navigation">${nav}</nav>
       <span class="spacer"></span>
       <button class="sync-ind" data-syncnow title="Synchronisation"></button>
-      <button class="btn primary sm add-btn" data-add title="Nouvelle tâche">${icon('plus', 18)}<span class="hide-sm">Tâche</span></button>
     </header>
     <main id="view" tabindex="-1"></main>
     <nav class="bottom-nav" aria-label="Navigation">${nav}</nav>

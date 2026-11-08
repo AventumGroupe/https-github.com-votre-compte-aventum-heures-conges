@@ -1,7 +1,7 @@
 // Propositions : l'application ne planifie pas seule, elle suggère.
 // Logique d'énergie : les tâches plombantes plutôt le matin, ou à déléguer.
 
-import { db, tasks, putTask, save, local, people, score, quadrant } from './store.js';
+import { db, tasks, putTask, save, local, people, score, category } from './store.js';
 import { tStart, tEnd, setSpan, proposeSlot, analyze, propagate } from './sched.js';
 import { fmt, cap, sameDay, addDays, startOfDay, toDateStr, MIN, HOUR } from './util.js';
 
@@ -56,19 +56,19 @@ export function suggestions(analysis = analyze()) {
   }
 
   // 2. Urgent et important non planifié
-  for (const t of open.filter((t) => !t.start && quadrant(t) === 'faire').sort((a, b) => score(b) - score(a)).slice(0, 3)) {
+  for (const t of open.filter((t) => !t.start && category(t) === 'priorite').sort((a, b) => score(b) - score(a)).slice(0, 3)) {
     const slot = proposeSlot(t, { morning: t.energy <= 2 });
     if (!slot) continue;
     push({
       key: `doit:${t.id}`, kind: 'plan', tone: 'accent', taskId: t.id,
-      title: 'Urgent et important, pas encore planifié',
+      title: 'Priorité non planifiée',
       text: `Placer « ${t.title} » ${slotLabel(slot)} ?`,
       actions: [{ label: 'Placer', run: () => placeAt(t, slot) }],
     });
   }
 
   // 3. Plombantes à faire le matin
-  for (const t of open.filter((t) => t.energy <= 2 && !t.start && quadrant(t) !== 'faire').sort((a, b) => score(b) - score(a)).slice(0, 4)) {
+  for (const t of open.filter((t) => t.energy <= 2 && !t.start && !t.delegate && !['deleguer', 'collaborer', 'cote'].includes(category(t))).sort((a, b) => score(b) - score(a)).slice(0, 4)) {
     const slot = proposeSlot(t, { morning: true });
     if (!slot) continue;
     push({
@@ -95,20 +95,19 @@ export function suggestions(analysis = analyze()) {
     });
   }
 
-  // 5. À déléguer : plombante et peu importante, ou urgente et peu importante
+  // 5. À déléguer / confier : catégories « déléguer ou automatiser » et « avec un collaborateur »
   for (const t of open) {
     if (t.delegate) continue;
-    const heavy = t.energy <= 2 && t.importance <= 2;
-    const q = quadrant(t) === 'deleguer';
-    if (!heavy && !q) continue;
+    const c = category(t);
+    if (c !== 'deleguer' && c !== 'collaborer') continue;
     push({
-      key: `delegate:${t.id}`, kind: 'delegate', tone: 'muted', taskId: t.id,
-      title: 'À déléguer ?',
-      text: heavy
-        ? `« ${t.title} » est plombante et peu importante${team.length ? ` : ${team.slice(0, 3).map((p) => p.name).join(', ')} pourrai(en)t s’en charger` : ''}.`
-        : `« ${t.title} » est urgente mais peu importante : un bon candidat à la délégation.`,
+      key: `delegate:${t.id}`, kind: 'delegate', tone: c === 'deleguer' ? 'warn' : 'energy', taskId: t.id,
+      title: c === 'deleguer' ? 'Déléguer ou automatiser' : 'Confier à un collaborateur',
+      text: c === 'deleguer'
+        ? `« ${t.title} » est urgente et importante mais plombante : confiez-la ou automatisez-la.`
+        : `« ${t.title} » est importante, pas urgente, mais plombante : planifiez-la dans le temps avec un collaborateur.`,
       actions: team.length
-        ? team.slice(0, 3).map((p) => ({ label: `Confier à ${p.name}`, run: () => { t.delegate = p.id; putTask(t); } }))
+        ? team.slice(0, 4).map((p) => ({ label: `Confier à ${p.name}`, run: () => { t.delegate = p.id; putTask(t); } }))
         : [{ label: 'Ajouter une personne', href: '#ressources' }],
     });
   }

@@ -8,11 +8,12 @@ import { renderGantt } from './gantt.js';
 import { renderResources } from './resources.js';
 import { openTaskEditor } from './editor.js';
 import * as ms from './outlook.js';
+import { ghSync, ghStatus, onGhStatus, ghConfigured, ghRepo, ghSetup, ghDisconnect } from './github.js';
 import { notifSupported, notifEnabled, enableNotifications, disableNotifications, show, startReminders } from './notify.js';
 import { toast, confirmDialog, slider, bindSliders, info } from './ui.js';
 import { $, esc, icon, debounce, download, toLocal, toDateStr, addDays, startOfDay, fmt } from './util.js';
 
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const TABS = [
   { id: 'taches', label: 'Tâches', icon: 'list', render: renderList },
   { id: 'calendrier', label: 'Calendrier', icon: 'calendar', render: renderCalendar },
@@ -74,19 +75,21 @@ function shell() {
   document.body.addEventListener('click', (e) => {
     if (e.target.closest('[data-add]')) openTaskEditor();
     if (e.target.closest('[data-syncnow]')) {
-      if (ms.isConnected()) manualSync(); else location.hash = '#reglages';
+      if (ms.isConnected() || ghConfigured()) manualSync(); else location.hash = '#reglages';
     }
   });
-  updateSyncIndicator(ms.getStatus());
+  updateSyncIndicator();
 }
 
-function updateSyncIndicator(s) {
+const syncStatus = () => (ghConfigured() ? ghStatus() : ms.getStatus());
+
+function updateSyncIndicator(s = syncStatus()) {
   const el = document.querySelector('.sync-ind');
   if (!el) return;
-  const connected = ms.isConnected();
+  const connected = ms.isConnected() || ghConfigured();
   const last = s.last ? `Dernière synchronisation : ${fmt.time.format(new Date(s.last))}` : '';
   const map = {
-    off: [connected ? 'idle' : 'off', connected ? 'Synchronisé' : 'Local', 'Données sur cet appareil uniquement. Connectez Outlook dans les réglages pour synchroniser.'],
+    off: [connected ? 'idle' : 'off', connected ? 'Synchronisé' : 'Local', 'Données sur cet appareil uniquement. Activez la synchronisation dans les réglages.'],
     idle: ['idle', 'Synchronisé', last],
     syncing: ['syncing', 'Synchronisation…', s.detail || ''],
     offline: ['offline', 'Hors connexion', 'Les modifications sont enregistrées et seront synchronisées au retour du réseau.'],
@@ -99,19 +102,29 @@ function updateSyncIndicator(s) {
 
 async function manualSync() {
   try {
-    const r = await ms.syncAll({ manual: true });
-    if (r) toast(`Synchronisé · ${r.pulled} reçue(s) d’Outlook, ${r.pushed} envoyée(s), ${r.removed} retirée(s).`);
+    if (ghConfigured()) {
+      const r = await ghSync({ manual: true });
+      if (r && !ms.isConnected()) toast(r.pushed ? 'Synchronisé : modifications envoyées sur GitHub.' : 'Synchronisé : tout est à jour.');
+    }
+    if (ms.isConnected()) {
+      const r = await ms.syncAll({ manual: true });
+      if (r) toast(`Synchronisé · ${r.pulled} reçue(s) d’Outlook, ${r.pushed} envoyée(s), ${r.removed} retirée(s).`);
+    }
   } catch (e) {
-    toast(`Synchronisation impossible : ${ms.getStatus().error || e.message}`, { tone: 'danger', timeout: 6000 });
+    toast(`Synchronisation impossible : ${e.message}`, { tone: 'danger', timeout: 6000 });
   }
 }
 
-const autoSync = debounce(() => { if (ms.isConnected()) ms.syncAll(); }, 4000);
+// Après une modification : GitHub puis Outlook (la synchro GitHub attend 6 s pour regrouper les saisies).
+const autoSyncGh = debounce(() => { if (ghConfigured()) ghSync(); }, 6000);
+const autoSyncMs = debounce(() => { if (ms.isConnected()) ms.syncAll(); }, 4000);
+const autoSync = () => { autoSyncGh(); autoSyncMs(); };
 
 // ---------- Réglages ----------
 function renderSettings(el) {
   const S = db.settings;
   const st = ms.getStatus();
+  const gs = ghStatus();
   const connected = ms.isConnected();
   const hours = (from, to, v) => Array.from({ length: to - from + 1 }, (_, i) => from + i).map((h) => `<option value="${h}" ${v === h ? 'selected' : ''}>${h} h</option>`).join('');
   const WD = [[1, 'Lun'], [2, 'Mar'], [3, 'Mer'], [4, 'Jeu'], [5, 'Ven'], [6, 'Sam'], [0, 'Dim']];
@@ -142,7 +155,31 @@ function renderSettings(el) {
       </section>
 
       <section class="card set">
-        <h3>${icon('sync', 18)} Outlook et appareils ${info('outlook')}</h3>
+        <h3>${icon('sync', 18)} Téléphone ↔ ordinateur ${info('github')}</h3>
+        ${ghConfigured() ? `
+          <p class="ok-text">${icon('check', 16)} Synchronisé avec <b>${esc(ghRepo())}</b></p>
+          <div class="row wrap gap">
+            <button class="btn primary" data-act="ghsync">${icon('sync', 16)} Synchroniser</button>
+            <button class="btn ghost" data-act="ghoff">Déconnecter cet appareil</button>
+          </div>
+          <p class="hint">${gs.last ? `${fmt.dayShort.format(new Date(gs.last))} · ${fmt.time.format(new Date(gs.last))}` : ''}${gs.error ? ` <span class="danger-text">${esc(gs.error)}</span>` : ''}</p>`
+        : `
+          <label class="field"><span>Dépôt privé des données</span><input type="text" data-ghrepo value="${esc(ghRepo())}" spellcheck="false" autocomplete="off"></label>
+          <label class="field"><span>Clé d’accès GitHub</span><input type="password" data-ghtoken placeholder="github_pat_…" spellcheck="false" autocomplete="off"></label>
+          <div class="row wrap gap"><button class="btn primary" data-act="ghon">Connecter</button></div>
+          ${gs.error ? `<p class="danger-text">${esc(gs.error)}</p>` : ''}
+          <details class="howto"><summary>${icon('info', 16)} Créer la clé d’accès</summary>
+            <ol>
+              <li>Ouvrir <code class="copy" data-copy="https://github.com/settings/personal-access-tokens/new">github.com/settings/personal-access-tokens/new</code></li>
+              <li>Nom : <i>Plannings</i>. Expiration : la plus longue possible.</li>
+              <li>Repository access : <b>Only select repositories</b> → <b>${esc(ghRepo())}</b>.</li>
+              <li>Permissions → Repository → <b>Contents : Read and write</b>.</li>
+              <li><b>Generate token</b>, copier la clé (commence par <code>github_pat_</code>) et la coller ici, sur chaque appareil.</li>
+            </ol></details>`}
+      </section>
+
+      <section class="card set">
+        <h3>${icon('sync', 18)} Outlook ${info('outlook')}</h3>
         ${connected ? `
           <p class="ok-text">${icon('check', 16)} <b>${esc(ms.accountLabel())}</b></p>
           <label class="field"><span>Calendrier</span><select data-cal><option value="">Calendrier principal</option></select></label>
@@ -255,6 +292,18 @@ function renderSettings(el) {
     }
     if (act === 'logout') ms.logout();
     if (act === 'sync') manualSync();
+    if (act === 'ghsync') manualSync();
+    if (act === 'ghoff') { ghDisconnect(); toast('Cet appareil n’est plus synchronisé.'); render(); }
+    if (act === 'ghon') {
+      const repo = root.querySelector('[data-ghrepo]').value.trim();
+      const token = root.querySelector('[data-ghtoken]').value.trim();
+      if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { toast('Nom du dépôt attendu sous la forme compte/depot.'); return; }
+      if (token.length < 20) { toast('Collez la clé d’accès GitHub complète.'); return; }
+      ghSetup(repo, token);
+      try { await ghSync({ manual: true }); toast('Synchronisation activée : vos données sont sur GitHub.'); }
+      catch (err) { toast(err.message, { tone: 'danger', timeout: 7000 }); }
+      render();
+    }
     if (act === 'export') download(`gestion-plannings-${toDateStr(new Date())}.json`, exportJson());
     if (act === 'notif') { const p = await enableNotifications(); toast(p === 'granted' ? 'Notifications activées.' : 'Notifications refusées par le navigateur.'); render(); }
     if (act === 'nonotif') { disableNotifications(); render(); }
@@ -314,7 +363,8 @@ async function start() {
     rerender();
     if (!['sync', 'merge'].includes(reason)) autoSync();
   });
-  ms.onStatus((s) => { updateSyncIndicator(s); if (current === 'reglages' && s.state !== 'syncing') rerender(); });
+  ms.onStatus(() => { updateSyncIndicator(); if (current === 'reglages') rerender(); });
+  onGhStatus(() => { updateSyncIndicator(); if (current === 'reglages') rerender(); });
   setCalendarHooks({ connected: ms.isConnected, sync: manualSync });
 
   const moved = rollOverdue();
@@ -324,16 +374,22 @@ async function start() {
   setInterval(() => { if (rollOverdue().length) toast('Des tâches en retard ont été reportées.'); }, 10 * 60 * 1000);
   startReminders();
 
+  // Synchronisation entre appareils (GitHub)
+  if (ghConfigured()) ghSync();
+  setInterval(() => { if (ghConfigured() && !document.hidden) ghSync(); }, 2 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && ghConfigured()) ghSync(); });
+  window.addEventListener('online', () => { if (ghConfigured()) ghSync(); });
+
   // Connexion Microsoft et synchronisation
   const ok = await ms.initMs();
-  updateSyncIndicator(ms.getStatus());
+  updateSyncIndicator();
   if (ok) {
     ms.syncAll();
     setInterval(() => ms.syncAll(), 5 * 60 * 1000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) ms.syncAll(); });
     window.addEventListener('online', () => ms.syncAll());
   }
-  window.addEventListener('offline', () => updateSyncIndicator({ ...ms.getStatus(), state: 'offline' }));
+  window.addEventListener('offline', () => updateSyncIndicator({ ...syncStatus(), state: 'offline' }));
 }
 
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvent = e; if (current === 'reglages') render(); });

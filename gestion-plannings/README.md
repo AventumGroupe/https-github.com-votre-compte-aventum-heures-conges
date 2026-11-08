@@ -58,6 +58,16 @@ Au démarrage, puis toutes les 10 minutes, l'application cherche les tâches non
 
 Ses successeurs sont décalés à leur tour. Les tâches qui dépassent alors leur échéance passent en rouge. Ce report peut être désactivé dans les réglages.
 
+## Synchronisation téléphone ↔ ordinateur (GitHub)
+
+Les données sont copiées dans le fichier `plannings.json` d'un **dépôt GitHub privé** (par défaut `AventumGroupe/plannings-donnees`). L'APK et la version web le lisent et l'écrivent : mêmes données partout, fusion élément par élément (le plus récent gagne), historique conservé par GitHub.
+
+Mise en place sur chaque appareil : *Réglages → Téléphone ↔ ordinateur*, coller une clé d'accès GitHub « fine-grained » limitée au dépôt de données, avec la permission **Contents : Read and write** (création : github.com/settings/personal-access-tokens/new). Ne jamais utiliser le dépôt public du code pour les données.
+
+## Application Android (APK)
+
+Le dossier contient un projet Capacitor (`android/`, `capacitor.config.json`). Le workflow `.github/workflows/plannings-android.yml` construit l'APK à chaque modification et le publie dans « Releases » quand les secrets `SIGNING_KEYSTORE` et `SIGNING_PASSWORD` sont définis. Lien permanent : `https://github.com/AventumGroupe/https-github.com-votre-compte-aventum-heures-conges/releases/latest/download/gestion-plannings.apk`.
+
 ## Outlook et synchronisation téléphone ↔ ordinateur
 
 L'application n'a pas de compte propre : c'est la **connexion Microsoft** qui sert à tout.

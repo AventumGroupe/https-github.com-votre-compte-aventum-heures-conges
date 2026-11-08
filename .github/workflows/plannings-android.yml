@@ -73,8 +73,8 @@ jobs:
         if: env.SIGNING_KEYSTORE != ''
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: plannings-v1.3.${{ github.run_number }}
-          name: Gestion des plannings 1.3.${{ github.run_number }}
+          tag_name: plannings-v1.4.${{ github.run_number }}
+          name: Gestion des plannings 1.4.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           files: gestion-plannings/dist/gestion-plannings.apk

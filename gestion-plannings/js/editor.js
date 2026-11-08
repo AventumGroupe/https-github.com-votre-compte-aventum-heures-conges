@@ -2,7 +2,7 @@
 
 import {
   db, tasks, projects, resources, people, newTask, putTask, removeTask, save, newProject, putProject,
-  newResource, putResource, STATUS, ENERGY, RES_TYPES, category, CATEGORIES,
+  newResource, putResource, STATUS, ENERGY, RES_TYPES, category, CATEGORIES, catInfo, isLeader,
 } from './store.js';
 import { tStart, tEnd, setSpan, shiftTo, requiredStart, propagate, succsOf, completeTask, proposeSlot, RECUR } from './sched.js';
 import { openDialog, confirmDialog, toast, slider, bindSliders, info, LV, EN } from './ui.js';
@@ -160,7 +160,7 @@ export function openTaskEditor(idOrPreset = null) {
         ${slider('energy', { label: 'Énergie', ...EN, value: d.energy, kind: 'energy', infoKey: 'energie' })}
         ${slider('status', { label: 'Statut', values: st, labels: st.map((k) => STATUS[k]), value: d.status, ticks: 'labels', kind: 'status' })}
       </div>
-      <div class="cat-live c-${category(d)}" data-cat-live><i class="grp-dot"></i><b>${CATEGORIES[category(d)].label}</b><span>${CATEGORIES[category(d)].hint}</span></div>
+      <div class="cat-live c-${category(d)}" data-cat-live><i class="grp-dot"></i><b>${catInfo(category(d)).label}</b><span>${catInfo(category(d)).hint}</span></div>
       <div class="grid2">
         <label class="field"><span>Projet</span>
           <select data-f="projectId"><option value="">Sans projet</option>${projects().map((p) => `<option value="${p.id}" ${d.projectId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
@@ -169,9 +169,9 @@ export function openTaskEditor(idOrPreset = null) {
       </div>
       ${sec('planning', 'calendar', 'Planification', d.start ? 1 : 0, planningHtml(), 'planif', true)}
       <details class="block" ${d.delegate || d.reminder != null ? '' : ''}>
-        <summary>${icon('bell', 18)} <span>Rappel et délégation</span><span class="caret">${icon('chevR', 14)}</span></summary>
+        <summary>${icon('bell', 18)} <span>${isLeader() ? 'Rappel et délégation' : 'Rappel'}</span><span class="caret">${icon('chevR', 14)}</span></summary>
         ${slider('reminder', { label: 'Rappel', values: remIdx, labels: REMINDERS.map((r) => r[1]), value: d.reminder, ticks: false })}
-        <label class="field"><span>Déléguée à</span><select data-f="delegate"><option value="">Moi</option>${people().map((p) => `<option value="${p.id}" ${d.delegate === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+        <label class="field" ${isLeader() ? '' : 'hidden'}><span>Déléguée à</span><select data-f="delegate"><option value="">Moi</option>${people().map((p) => `<option value="${p.id}" ${d.delegate === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
       </details>
       ${sec('deps', 'link', 'Dépendances', nDep, depsHtml(), 'dependances', nDep > 0)}
       ${sec('res', 'people', 'Ressources', nRes, resHtml(), 'ressources', nRes > 0)}
@@ -216,7 +216,7 @@ export function openTaskEditor(idOrPreset = null) {
       d[name] = Number(v);
       const c = category(d), box = body.querySelector('[data-cat-live]');
       box.className = `cat-live c-${c}`;
-      box.innerHTML = `<i class="grp-dot"></i><b>${CATEGORIES[c].label}</b><span>${CATEGORIES[c].hint}</span>`;
+      box.innerHTML = `<i class="grp-dot"></i><b>${catInfo(c).label}</b><span>${catInfo(c).hint}</span>`;
     }
     else if (name === 'status') d.status = v;
     else if (name === 'reminder') d.reminder = v;

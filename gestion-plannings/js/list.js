@@ -1,6 +1,6 @@
 // Écran principal : la liste des tâches, la saisie rapide et les propositions.
 
-import { db, tasks, projects, newTask, putTask, removeTask, save, local, score, category, CATEGORIES, ENERGY, people } from './store.js';
+import { db, tasks, projects, newTask, putTask, removeTask, save, local, score, category, CATEGORIES, catInfo, isLeader, ENERGY, people } from './store.js';
 import { analyze, completeTask, propagate } from './sched.js';
 import { suggestions, dismiss } from './suggest.js';
 import { openTaskEditor } from './editor.js';
@@ -99,7 +99,7 @@ function suggestionsHtml(an) {
 const collapsedCats = local.get('collapsedCats', { reste: true });
 
 function groupsHtml(list, an) {
-  return Object.entries(CATEGORIES).map(([k, c]) => {
+  return Object.keys(CATEGORIES).map((k) => { const c = catInfo(k);
     const items = list.filter((t) => category(t) === k);
     if (!items.length) return '';
     const closed = collapsedCats[k];
@@ -116,7 +116,7 @@ function groupsHtml(list, an) {
 function mapHtml(list, an) {
   const cell = (k) => {
     const items = list.filter((t) => category(t) === k);
-    const c = CATEGORIES[k];
+    const c = catInfo(k);
     return `<section class="cell c-${k}">
       <header><b>${c.label}</b><span class="count">${items.length}</span>${info('', c.hint)}</header>
       <ul class="mini">${items.map((t) => `<li data-open-id="${t.id}" class="${t.status === 'done' ? 'done' : ''}"><i class="edot e${t.energy}"></i><span>${esc(t.title)}</span><small>${score(t)}</small></li>`).join('') || '<li class="muted">—</li>'}</ul>

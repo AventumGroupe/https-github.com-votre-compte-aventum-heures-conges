@@ -12,7 +12,7 @@ import { notifSupported, notifEnabled, enableNotifications, disableNotifications
 import { toast, confirmDialog, slider, bindSliders, info } from './ui.js';
 import { $, esc, icon, debounce, download, toLocal, toDateStr, addDays, startOfDay, fmt } from './util.js';
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const TABS = [
   { id: 'taches', label: 'Tâches', icon: 'list', render: renderList },
   { id: 'calendrier', label: 'Calendrier', icon: 'calendar', render: renderCalendar },
@@ -125,6 +125,11 @@ function renderSettings(el) {
       <h2>Réglages</h2>
 
       <section class="card set">
+        <h3>${icon('user', 18)} Profil ${info('profil')}</h3>
+        ${slider('role', { values: ['dirigeant', 'collaborateur'], labels: ['Dirigeant', 'Collaborateur'], value: S.role, ticks: 'labels' })}
+      </section>
+
+      <section class="card set">
         <h3>${icon('sun', 18)} Journée</h3>
         <div class="grid3">
           ${hs(5, 12, 'dayStart', 'Début')}
@@ -200,7 +205,7 @@ function renderSettings(el) {
   const root = el.querySelector('.settings');
   bindSliders(root, (name, v, final) => {
     if (name === 'theme') { if (final) { setSettings({ theme: v }); applyTheme(); } return; }
-    if (final && ['dayStart', 'morningEnd', 'dayEnd', 'reminder'].includes(name)) setSettings({ [name]: v });
+    if (final && ['dayStart', 'morningEnd', 'dayEnd', 'reminder', 'role'].includes(name)) setSettings({ [name]: v });
   });
 
   root.addEventListener('change', async (e) => {

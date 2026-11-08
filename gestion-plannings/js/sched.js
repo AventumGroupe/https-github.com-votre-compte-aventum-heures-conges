@@ -2,7 +2,7 @@
 // décalage des retards, chemin critique, créneaux libres, récurrence.
 
 import { db, tasks, putTask, save, newTask, outlookEvents } from './store.js';
-import { parse, toLocal, toDateStr, addDays, startOfDay, sameDay, daysBetween, roundUp, uid, MIN, DAY } from './util.js';
+import { parse, toLocal, toDateStr, addDays, startOfDay, sameDay, daysBetween, roundUp, addMinutes, uid, MIN, DAY } from './util.js';
 
 // ---------- Bornes d'une tâche ----------
 // Tâche « journée entière » : start/end = premier/dernier jour (inclus), à minuit.
@@ -233,7 +233,7 @@ export function busyOn(day, exceptId = null) {
 }
 
 /** Premier créneau libre de durMin minutes, entre fromH et toH, le jour donné. */
-export function findFreeSlot(day, durMin, fromH, toH, exceptId = null) {
+export function findFreeSlot(day, durMin, fromH, toH, exceptId = null, accept = null) {
   const now = new Date();
   let x = startOfDay(day); x.setHours(Math.floor(fromH), Math.round((fromH % 1) * 60), 0, 0);
   const lim = startOfDay(day); lim.setHours(toH, 0, 0, 0);
@@ -243,22 +243,50 @@ export function findFreeSlot(day, durMin, fromH, toH, exceptId = null) {
   while (x.getTime() + durMin * MIN <= lim.getTime() && guard++ < 200) {
     const e = new Date(x.getTime() + durMin * MIN);
     const clash = busy.find(([s, b]) => s < e && b > x);
-    if (!clash) return x;
+    if (!clash && (!accept || accept(x, e))) return x;
+    if (!clash) { x = addMinutes(x, 15); continue; }
     x = roundUp(new Date(Math.max(clash[1].getTime(), x.getTime() + 15 * MIN)), 15);
   }
   return null;
 }
 
 /** Cherche sur plusieurs jours ouvrés un créneau (par défaut le matin). */
-export function proposeSlot(t, { morning = true, fromDay = new Date(), days = 10 } = {}) {
+const PLOMB_DAY_MAX = 150; // minutes de tâches plombantes au plus par jour (créneaux propices)
+const PLOMB_GAP = 30;      // pas deux tâches plombantes à moins de 30 min d'écart
+
+/** Charge plombante du jour (minutes) et créneaux plombants existants. */
+function plombOn(day, exceptId) {
+  const ds = startOfDay(day), de = addDays(ds, 1);
+  return tasks().filter((o) => o.id !== exceptId && o.start && !o.allDay && o.status !== 'done' && o.energy <= 2 && tStart(o) < de && tEnd(o) > ds);
+}
+
+/**
+ * Créneau « propice » pour une tâche plombante : le matin, pas collée à une autre tâche plombante,
+ * sans dépasser la charge plombante raisonnable de la journée ; les plus plombantes au plus tôt.
+ */
+export function gentleAccept(t, day) {
+  const others = plombOn(day, t.id);
+  const load = others.reduce((m, o) => m + (tEnd(o) - tStart(o)) / MIN, 0);
+  return (s, e) => {
+    if (load + (e - s) / MIN > PLOMB_DAY_MAX) return false;
+    return !others.some((o) => tStart(o).getTime() < e.getTime() + PLOMB_GAP * MIN && tEnd(o).getTime() > s.getTime() - PLOMB_GAP * MIN);
+  };
+}
+
+export function proposeSlot(t, { morning = true, fromDay = new Date(), days = 10, gentle = null } = {}) {
   const S = db.settings;
   const dur = t.estimate || 60;
+  const soft = gentle ?? (S.role === 'collaborateur' && t.energy <= 2);
   let d = startOfDay(fromDay);
   for (let i = 0; i < days + 7; i++, d = addDays(d, 1)) {
     if (!S.workDays.includes(d.getDay())) continue;
-    const slot = morning
-      ? findFreeSlot(d, dur, S.dayStart, Math.max(S.morningEnd, S.dayStart + dur / 60), t.id)
-      : findFreeSlot(d, dur, S.dayStart, S.dayEnd, t.id);
+    const accept = soft ? gentleAccept(t, d) : null;
+    // Très plombante : dans les deux premières heures de la journée si possible
+    const early = soft && t.energy === 1 ? Math.max(S.dayStart + 2, S.dayStart + dur / 60) : null;
+    const slot = (early && findFreeSlot(d, dur, S.dayStart, early, t.id, accept))
+      || (morning
+        ? findFreeSlot(d, dur, S.dayStart, Math.max(S.morningEnd, S.dayStart + dur / 60), t.id, accept)
+        : findFreeSlot(d, dur, S.dayStart, S.dayEnd, t.id, accept));
     if (slot) return slot;
   }
   return null;

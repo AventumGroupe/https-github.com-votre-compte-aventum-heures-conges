@@ -139,6 +139,7 @@ export const INFO = {
   rappels: `Application ouverte : rappels et résumé du matin. Application fermée : les rappels des rendez-vous Outlook synchronisés prennent le relais.`,
   sauvegarde: `L’import fusionne le fichier avec vos données (la version la plus récente de chaque élément gagne).`,
   installer: `Android (Chrome) : menu ⋮ → « Installer l’application ». Ordinateur (Chrome / Edge) : icône d’installation dans la barre d’adresse. Fonctionne ensuite hors connexion.`,
+  profil: `<b>Dirigeant</b> : les tâches plombantes peuvent être déléguées ou automatisées.<br><b>Collaborateur</b> : pas de délégation ; l’application cherche des moments propices : le matin (les plus plombantes en tout début de journée), jamais deux tâches plombantes d’affilée, 2 h 30 de plombant au plus par jour, des séances courtes, puis une tâche dynamisante pour récupérer.`,
   projet: `Une tâche qui finirait après l’échéance du projet passe en rouge dans le Gantt.`,
 };
 

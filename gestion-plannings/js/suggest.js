@@ -1,8 +1,8 @@
 // Propositions : l'application ne planifie pas seule, elle suggère.
 // Logique d'énergie : les tâches plombantes plutôt le matin, ou à déléguer.
 
-import { db, tasks, putTask, save, local, people, score, category } from './store.js';
-import { tStart, tEnd, setSpan, proposeSlot, analyze, propagate } from './sched.js';
+import { db, tasks, putTask, save, local, people, score, category, isLeader } from './store.js';
+import { tStart, tEnd, setSpan, proposeSlot, analyze, propagate, findFreeSlot } from './sched.js';
 import { fmt, cap, sameDay, addDays, startOfDay, toDateStr, MIN, HOUR } from './util.js';
 
 const DISMISS_DAYS = 7;
@@ -68,14 +68,16 @@ export function suggestions(analysis = analyze()) {
   }
 
   // 3. Plombantes à faire le matin
-  for (const t of open.filter((t) => t.energy <= 2 && !t.start && !t.delegate && !['deleguer', 'collaborer', 'cote'].includes(category(t))).sort((a, b) => score(b) - score(a)).slice(0, 4)) {
+  for (const t of open.filter((t) => t.energy <= 2 && !t.start && !t.delegate && (isLeader() ? !['deleguer', 'collaborer', 'cote'].includes(category(t)) : category(t) !== 'cote')).sort((a, b) => score(b) - score(a)).slice(0, 4)) {
     const slot = proposeSlot(t, { morning: true });
     if (!slot) continue;
     push({
       key: `morning:${t.id}`, kind: 'morning', tone: 'energy', taskId: t.id,
-      title: 'Tâche plombante : à faire le matin',
-      text: `« ${t.title} » demande de l’énergie. Créneau libre : ${slotLabel(slot)}.`,
-      actions: [{ label: 'Placer le matin', run: () => placeAt(t, slot) }],
+      title: isLeader() ? 'Tâche plombante : à faire le matin' : 'Moment propice',
+      text: isLeader()
+        ? `« ${t.title} » demande de l’énergie. Créneau libre : ${slotLabel(slot)}.`
+        : `« ${t.title} » est plombante : ${slotLabel(slot)}, le matin, loin d’une autre tâche plombante et sans surcharger la journée.`,
+      actions: [{ label: isLeader() ? 'Placer le matin' : 'Placer', run: () => placeAt(t, slot) }],
     });
   }
 
@@ -96,7 +98,7 @@ export function suggestions(analysis = analyze()) {
   }
 
   // 5. À déléguer / confier : catégories « déléguer ou automatiser » et « avec un collaborateur »
-  for (const t of open) {
+  for (const t of isLeader() ? open : []) {
     if (t.delegate) continue;
     const c = category(t);
     if (c !== 'deleguer' && c !== 'collaborer') continue;
@@ -112,16 +114,54 @@ export function suggestions(analysis = analyze()) {
     });
   }
 
+  // 6b. Collaborateur : tâche très plombante et longue -> séances courtes
+  if (!isLeader()) {
+    for (const t of open.filter((t) => t.energy === 1 && (t.estimate || 60) > 90 && !t.allDay)) {
+      push({
+        key: `split:${t.id}`, kind: 'split', tone: 'energy', taskId: t.id,
+        title: 'Découper en séances',
+        text: `« ${t.title} » est très plombante (${Math.round((t.estimate || 60) / 60 * 10) / 10} h). Mieux vaut 2 à 3 séances d’environ 45 min sur plusieurs matinées, notées en sous-tâches.`,
+        actions: [{ label: 'Découper', run: () => {
+          const n = Math.min(4, Math.ceil((t.estimate || 60) / 45));
+          if (!t.subtasks.length) t.subtasks = Array.from({ length: n }, (_, i) => ({ id: `${t.id}-s${i}`, title: `Séance ${i + 1}`, done: false }));
+          t.estimate = Math.ceil((t.estimate || 60) / n / 15) * 15;
+          if (t.start) setSpan(t, tStart(t), new Date(tStart(t).getTime() + t.estimate * MIN));
+          putTask(t);
+        } }],
+      });
+    }
+  }
+
+  // 7. Enchaîner une tâche plombante avec une tâche dynamisante (récupération)
+  const lift = open.filter((t) => !t.start && t.energy >= 3).sort((a, b) => score(b) - score(a));
+  let liftN = 0;
+  for (const t of open.filter((t) => t.start && !t.allDay && t.energy <= 2).sort((a, b) => a.start.localeCompare(b.start))) {
+    if (!lift.length || liftN >= (isLeader() ? 1 : 2)) break;
+    const end = tEnd(t);
+    if (end < now || end > addDays(now, 2)) continue;
+    const next = lift[0];
+    const from = end.getHours() + end.getMinutes() / 60;
+    const slot = findFreeSlot(end, next.estimate || 30, from, Math.min(S.dayEnd, from + 1), next.id);
+    if (!slot || slot.getTime() !== end.getTime()) continue;
+    lift.shift(); liftN++;
+    push({
+      key: `lift:${t.id}:${next.id}`, kind: 'lift', tone: 'accent', taskId: next.id,
+      title: 'Enchaîner avec une dynamisante',
+      text: `Après « ${t.title} » (plombante), « ${next.title} » redonnera de l’énergie : ${slotLabel(slot)}.`,
+      actions: [{ label: 'Enchaîner', run: () => placeAt(next, slot) }],
+    });
+  }
+
   // 6. Journée trop plombante
   for (let i = 0; i < 5; i++) {
     const d = addDays(startOfDay(now), i);
     const heavy = open.filter((t) => t.start && !t.allDay && t.energy <= 2 && sameDay(tStart(t), d));
     const hours = heavy.reduce((h, t) => h + (tEnd(t) - tStart(t)) / HOUR, 0);
-    if (hours >= 4) {
+    if (hours >= (isLeader() ? 4 : 2.5)) {
       push({
         key: `heavy:${d.toDateString()}`, kind: 'balance', tone: 'warn',
         title: 'Journée chargée en plombant',
-        text: `${cap(fmt.dayLong.format(d))} : ${hours.toFixed(1).replace('.', ',')} h de tâches plombantes. Pensez à intercaler une tâche dynamisante ou à en déléguer une.`,
+        text: `${cap(fmt.dayLong.format(d))} : ${hours.toFixed(1).replace('.', ',')} h de tâches plombantes. ${isLeader() ? 'Intercalez une tâche dynamisante ou déléguez-en une.' : 'Reportez-en une sur une autre matinée ou intercalez une tâche dynamisante.'}`,
         actions: [{ label: 'Voir le jour', href: `#calendrier/jour/${toDateStr(d)}` }],
       });
     }

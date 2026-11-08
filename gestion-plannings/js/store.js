@@ -38,6 +38,7 @@ export const DEFAULT_SETTINGS = {
   autoShift: true,
   reminder: 15,
   theme: 'auto',
+  role: 'dirigeant',
   updatedAt: 0,
 };
 
@@ -103,6 +104,13 @@ export const resources = () => Object.values(db.resources).sort((a, b) => a.name
 export const people = () => resources().filter((r) => r.type === 'personne');
 
 export const score = (t) => t.importance * 2 + t.urgency; // de 3 à 15
+const CAT_COLLAB = {
+  deleguer: { label: 'Au meilleur moment', hint: 'Urgentes et importantes mais plombantes : sur un créneau d’énergie haute (le matin), sans enchaîner deux tâches plombantes.', short: 'Meilleur moment' },
+  collaborer: { label: 'À planifier au calme', hint: 'Importantes, pas urgentes, plombantes : à étaler dans le temps, en séances courtes, sur des créneaux propices.', short: 'Au calme' },
+};
+export const isLeader = () => db.settings.role !== 'collaborateur';
+/** Libellé d'une catégorie selon le profil (dirigeant : déléguer ; collaborateur : moment propice). */
+export const catInfo = (k) => (!isLeader() && CAT_COLLAB[k]) || CATEGORIES[k];
 export const isUrgent = (t) => t.urgency >= 4;
 export const isImportant = (t) => t.importance >= 4;
 export const isEnergizing = (t) => t.energy >= 3;

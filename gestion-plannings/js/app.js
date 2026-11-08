@@ -9,10 +9,10 @@ import { renderResources } from './resources.js';
 import { openTaskEditor } from './editor.js';
 import * as ms from './outlook.js';
 import { notifSupported, notifEnabled, enableNotifications, disableNotifications, show, startReminders } from './notify.js';
-import { toast, confirmDialog, seg, bindSeg } from './ui.js';
+import { toast, confirmDialog, slider, bindSliders, info } from './ui.js';
 import { $, esc, icon, debounce, download, toLocal, toDateStr, addDays, startOfDay, fmt } from './util.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const TABS = [
   { id: 'taches', label: 'Tâches', icon: 'list', render: renderList },
   { id: 'calendrier', label: 'Calendrier', icon: 'calendar', render: renderCalendar },
@@ -118,99 +118,91 @@ function renderSettings(el) {
   const WD = [[1, 'Lun'], [2, 'Mar'], [3, 'Mer'], [4, 'Jeu'], [5, 'Ven'], [6, 'Sam'], [0, 'Dim']];
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 
+  const H = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+  const hs = (from, to, k, label) => slider(k, { label, values: H(from, to), labels: H(from, to).map((h) => `${h} h`), value: S[k], ticks: false });
+  const rem = [null, 0, 5, 10, 15, 30, 60];
   el.innerHTML = `
     <section class="view settings">
       <h2>Réglages</h2>
 
       <section class="card set">
-        <h3>${icon('sun', 18)} Journée de travail</h3>
+        <h3>${icon('sun', 18)} Journée</h3>
         <div class="grid3">
-          <label class="field"><span>Début de journée</span><select data-s="dayStart">${hours(5, 12, S.dayStart)}</select></label>
-          <label class="field"><span>Fin de matinée</span><select data-s="morningEnd">${hours(9, 14, S.morningEnd)}</select></label>
-          <label class="field"><span>Fin de journée</span><select data-s="dayEnd">${hours(15, 23, S.dayEnd)}</select></label>
+          ${hs(5, 12, 'dayStart', 'Début')}
+          ${hs(9, 14, 'morningEnd', 'Fin de matinée')}
+          ${hs(15, 23, 'dayEnd', 'Fin')}
         </div>
         <div class="field"><span>Jours travaillés</span><div class="weekdays">${WD.map(([v, l]) => `<button type="button" class="wd ${S.workDays.includes(v) ? 'on' : ''}" data-wd="${v}">${l}</button>`).join('')}</div></div>
-        <label class="switch"><input type="checkbox" data-s="autoShift" ${S.autoShift ? 'checked' : ''}><span></span> Décaler automatiquement les tâches en retard et leurs successeurs</label>
-        <p class="hint">Une tâche non terminée dont la fin est passée est reportée au prochain créneau ; ses successeurs suivent. Celles qui dépassent alors leur échéance apparaissent en rouge.</p>
-        <label class="field"><span>Rappel par défaut des nouvelles tâches</span>
-          <select data-s="reminder">${[[null, 'Aucun'], [0, 'À l’heure'], [5, '5 min avant'], [10, '10 min avant'], [15, '15 min avant'], [30, '30 min avant'], [60, '1 h avant']].map(([v, l]) => `<option value="${v ?? ''}" ${S.reminder === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <div class="row gap"><label class="switch"><input type="checkbox" data-s="autoShift" ${S.autoShift ? 'checked' : ''}><span></span> Décaler les retards</label>${info('retards')}</div>
+        ${slider('reminder', { label: 'Rappel par défaut', values: rem, labels: ['Aucun', 'À l’heure', '5 min', '10 min', '15 min', '30 min', '1 h'], value: S.reminder, ticks: false })}
       </section>
 
       <section class="card set">
-        <h3>${icon('sync', 18)} Outlook et synchronisation entre appareils</h3>
-        <p>La connexion à votre compte Microsoft permet :</p>
-        <ul class="bullets">
-          <li><b>Outlook dans les deux sens</b> : vos tâches planifiées deviennent des rendez-vous (avec rappel) ; si vous en déplacez un dans Outlook, la tâche suit. Vos autres rendez-vous s’affichent dans le calendrier pour planifier autour.</li>
-          <li><b>Téléphone ↔ ordinateur</b> : les données sont copiées dans un fichier privé de votre OneDrive (dossier « Applications »), sans autre compte à créer.</li>
-        </ul>
+        <h3>${icon('sync', 18)} Outlook et appareils ${info('outlook')}</h3>
         ${connected ? `
-          <p class="ok-text">${icon('check', 16)} Connecté : <b>${esc(ms.accountLabel())}</b></p>
-          <label class="field"><span>Calendrier Outlook utilisé</span><select data-cal><option value="">Calendrier principal</option></select></label>
+          <p class="ok-text">${icon('check', 16)} <b>${esc(ms.accountLabel())}</b></p>
+          <label class="field"><span>Calendrier</span><select data-cal><option value="">Calendrier principal</option></select></label>
           <div class="row wrap gap">
-            <button class="btn primary" data-act="sync">${icon('sync', 16)} Synchroniser maintenant</button>
+            <button class="btn primary" data-act="sync">${icon('sync', 16)} Synchroniser</button>
             <button class="btn ghost" data-act="logout">Se déconnecter</button>
           </div>
-          <p class="hint">${st.last ? `Dernière synchronisation : ${fmt.dayShort.format(new Date(st.last))} à ${fmt.time.format(new Date(st.last))}.` : 'Pas encore synchronisé.'}
-            ${st.error ? `<br><span class="danger-text">${esc(st.error)}</span>` : ''}</p>`
+          <p class="hint">${st.last ? `${fmt.dayShort.format(new Date(st.last))} · ${fmt.time.format(new Date(st.last))}` : ''}${st.error ? ` <span class="danger-text">${esc(st.error)}</span>` : ''}</p>`
         : `
-          <label class="field"><span>Identifiant d’application Microsoft (client ID)</span>
+          <label class="field"><span>Identifiant d’application (client ID)</span>
             <input type="text" data-clientid value="${esc(ms.clientId())}" placeholder="00000000-0000-0000-0000-000000000000" spellcheck="false" autocomplete="off"></label>
           <div class="row wrap gap">
-            <button class="btn primary" data-act="login" ${window.msal ? '' : 'disabled'}>Se connecter à Microsoft</button>
+            <button class="btn primary" data-act="login" ${window.msal ? '' : 'disabled'}>Se connecter</button>
           </div>
           ${st.error ? `<p class="danger-text">${esc(st.error)}</p>` : ''}
-          <details class="howto"><summary>Comment obtenir l’identifiant d’application (une seule fois, 5 minutes)</summary>
+          <details class="howto"><summary>${icon('info', 16)} Obtenir l’identifiant</summary>
             <ol>
-              <li>Ouvrez <b>portal.azure.com</b> → « Microsoft Entra ID » → « Inscriptions d’applications » → « Nouvelle inscription ».</li>
-              <li>Nom : <i>Gestion des plannings</i>. Types de comptes : <b>« Comptes dans un annuaire organisationnel et comptes Microsoft personnels »</b>.</li>
-              <li>URI de redirection : plateforme <b>« Application monopage (SPA) »</b>, adresse :<br><code class="copy" data-copy="${esc(ms.redirectUri())}">${esc(ms.redirectUri())}</code></li>
-              <li>Dans « Autorisations des API » → Microsoft Graph → autorisations déléguées : <code>Calendars.ReadWrite</code>, <code>Files.ReadWrite.AppFolder</code>, <code>User.Read</code>.</li>
-              <li>Copiez « ID d’application (client) » ici, puis « Se connecter ». Faites de même sur le téléphone avec le même identifiant.</li>
+              <li><b>portal.azure.com</b> → Microsoft Entra ID → Inscriptions d’applications → Nouvelle.</li>
+              <li>Comptes : <b>organisationnels et personnels</b>.</li>
+              <li>Redirection <b>SPA</b> : <code class="copy" data-copy="${esc(ms.redirectUri())}">${esc(ms.redirectUri())}</code></li>
+              <li>API Graph déléguées : <code>Calendars.ReadWrite</code> <code>Files.ReadWrite.AppFolder</code> <code>User.Read</code></li>
+              <li>Copier l’ID d’application ici.</li>
             </ol></details>`}
         <hr>
-        <h4>Sauvegarde manuelle</h4>
         <div class="row wrap gap">
-          <button class="btn ghost" data-act="export">Exporter (.json)</button>
-          <label class="btn ghost">Importer…<input type="file" accept="application/json,.json" data-import hidden></label>
+          <button class="icon-btn" data-act="export" title="Exporter une sauvegarde (.json)" aria-label="Exporter">${icon('download', 18)}</button>
+          <label class="icon-btn" title="Importer une sauvegarde" aria-label="Importer">${icon('upload', 18)}<input type="file" accept="application/json,.json" data-import hidden></label>
+          <span class="muted sm">Sauvegarde</span>${info('sauvegarde')}
         </div>
-        <p class="hint">L’import fusionne le fichier avec vos données (la version la plus récente de chaque tâche est conservée). Utile aussi pour transférer vers un autre appareil sans compte Microsoft.</p>
       </section>
 
       <section class="card set">
-        <h3>${icon('bell', 18)} Rappels</h3>
-        ${!notifSupported() ? '<p class="muted">Ce navigateur ne gère pas les notifications.</p>'
-          : notifEnabled() ? `<p class="ok-text">${icon('check', 16)} Notifications activées.</p>
-            <div class="row gap"><button class="btn ghost" data-act="testnotif">Tester</button><button class="btn ghost" data-act="nonotif">Désactiver</button></div>`
-          : `<button class="btn primary" data-act="notif">Activer les notifications</button>`}
-        <p class="hint">L’application affiche les rappels et un résumé du matin quand elle est ouverte. Quand elle est fermée, ce sont les rappels des rendez-vous Outlook synchronisés qui vous préviennent (application Outlook du téléphone).</p>
+        <h3>${icon('bell', 18)} Rappels ${info('rappels')}</h3>
+        ${!notifSupported() ? '<p class="muted">Non pris en charge.</p>'
+          : `<div class="row gap"><label class="switch"><input type="checkbox" data-notif ${notifEnabled() ? 'checked' : ''}><span></span> Notifications</label>
+             ${notifEnabled() ? `<button class="icon-btn xs" data-act="testnotif" title="Tester">${icon('bell', 16)}</button>` : ''}</div>`}
       </section>
 
       <section class="card set">
         <h3>Apparence</h3>
-        ${seg('theme', [{ v: 'auto', label: 'Automatique' }, { v: 'light', label: 'Clair' }, { v: 'dark', label: 'Sombre' }], S.theme)}
+        ${slider('theme', { values: ['light', 'auto', 'dark'], labels: ['Clair', 'Auto', 'Sombre'], value: S.theme, ticks: 'labels' })}
       </section>
 
       <section class="card set">
-        <h3>Installer l’application</h3>
-        ${standalone ? `<p class="ok-text">${icon('check', 16)} Application installée.</p>`
-          : installEvent ? `<button class="btn primary" data-act="install">Installer sur cet appareil</button>`
-          : `<p>Sur Android (Chrome) : menu ⋮ → <b>« Installer l’application »</b> ou « Ajouter à l’écran d’accueil ». Sur ordinateur (Chrome / Edge) : icône d’installation dans la barre d’adresse.</p>`}
-        <p class="hint">Une fois installée, l’application s’ouvre comme une application native et fonctionne hors connexion.</p>
+        <h3>Installer ${info('installer')}</h3>
+        ${standalone ? `<p class="ok-text">${icon('check', 16)} Installée</p>`
+          : installEvent ? `<button class="btn primary" data-act="install">Installer</button>` : '<p class="muted sm">Menu du navigateur → Installer</p>'}
       </section>
 
       <section class="card set">
         <h3>Données</h3>
-        <p>${tasks().length} tâche(s), ${Object.keys(db.projects).length} projet(s), ${Object.keys(db.resources).length} ressource(s) sur cet appareil.</p>
+        <p class="muted sm">${tasks().length} tâches · ${Object.keys(db.projects).length} projets · ${Object.keys(db.resources).length} ressources · v${VERSION}</p>
         <div class="row wrap gap">
-          <button class="btn ghost" data-act="demo">Charger un exemple</button>
-          <button class="btn ghost danger-text" data-act="wipe">Tout effacer</button>
+          <button class="btn ghost sm" data-act="demo">Exemple</button>
+          <button class="btn ghost sm danger-text" data-act="wipe">${icon('trash', 16)} Tout effacer</button>
         </div>
-        <p class="hint">Version ${VERSION}</p>
       </section>
     </section>`;
 
   const root = el.querySelector('.settings');
-  bindSeg(root, (name, v) => { if (name === 'theme') { setSettings({ theme: v }); applyTheme(); } });
+  bindSliders(root, (name, v, final) => {
+    if (name === 'theme') { if (final) { setSettings({ theme: v }); applyTheme(); } return; }
+    if (final && ['dayStart', 'morningEnd', 'dayEnd', 'reminder'].includes(name)) setSettings({ [name]: v });
+  });
 
   root.addEventListener('change', async (e) => {
     const k = e.target.dataset.s;
@@ -218,6 +210,11 @@ function renderSettings(el) {
       const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value === '' ? null : Number(e.target.value);
       setSettings({ [k]: v });
       if (k === 'autoShift' && v) { const m = rollOverdue(); if (m.length) toast(`${m.length} tâche(s) en retard décalée(s).`); }
+    }
+    if (e.target.matches('[data-notif]')) {
+      if (e.target.checked) { const p = await enableNotifications(); if (p !== 'granted') toast('Notifications refusées par le navigateur.'); }
+      else disableNotifications();
+      render(); return;
     }
     if (e.target.matches('[data-cal]')) { ms.setCalendarId(e.target.value); toast('Calendrier choisi. Synchronisation…'); manualSync(); }
     if (e.target.matches('[data-clientid]')) ms.setClientId(e.target.value);

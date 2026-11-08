@@ -4,11 +4,12 @@ import { db, tasks, projects, newTask, putTask, removeTask, save, local, score, 
 import { analyze, completeTask, propagate } from './sched.js';
 import { suggestions, dismiss } from './suggest.js';
 import { openTaskEditor } from './editor.js';
-import { seg, bindSeg, levelOptions, energyOptions, energyChip, levelChip, projectChip, whenLabel, dueLabel, toast } from './ui.js';
+import { slider, bindSliders, info, LV, EN, energyChip, levelChip, projectChip, whenLabel, dueLabel, toast } from './ui.js';
 import { esc, icon, toDateStr } from './util.js';
 
 const F = Object.assign({ status: 'open', project: '', energy: '', q: '', sort: 'score', mode: 'list', sugg: true }, local.get('listFilters', {}));
 const Q = Object.assign({ urgency: 3, importance: 3, energy: 3 }, local.get('quick', {}));
+const activeFilters = () => [F.project, F.energy, F.sort !== 'score' ? 1 : ''].filter(Boolean).length;
 const persist = () => { local.set('listFilters', F); local.set('quick', Q); };
 
 function filtered() {
@@ -73,18 +74,26 @@ function suggestionsHtml(an) {
   if (!list.length) return '';
   return `
     <section class="card suggest ${F.sugg ? 'open' : ''}">
-      <button class="suggest-head" data-toggle-sugg aria-expanded="${F.sugg}">
-        ${icon('bulb', 18)} <b>Propositions</b> <span class="count">${list.length}</span>
-        <span class="spacer"></span><span class="muted sm">${F.sugg ? 'Masquer' : 'Afficher'}</span>
-      </button>
-      ${F.sugg ? `<ul class="suggest-list">${list.slice(0, 8).map((s, i) => `
+      <div class="suggest-head">
+        <button class="suggest-toggle" data-toggle-sugg aria-expanded="${F.sugg}">
+          ${icon('bulb', 18)} <b>Propositions</b> <span class="count">${list.length}</span>
+          <span class="caret ${F.sugg ? 'open' : ''}">${icon('chevR', 16)}</span>
+        </button>
+        ${info('propositions')}
+      </div>
+      ${F.sugg ? `<ul class="suggest-list">${list.slice(0, 8).map((s, i) => {
+        const t = s.taskId && db.tasks[s.taskId];
+        return `
         <li class="sg tone-${s.tone}" data-sg="${i}">
-          <div><b>${esc(s.title)}</b><p>${esc(s.text)}</p></div>
+          <div class="sg-txt"><b>${esc(s.title)}</b>${t ? `<span>${esc(t.title)}</span>` : ''}</div>
+          ${info('', s.text)}
           <div class="sg-actions">
-            ${s.actions.map((a, j) => a.href ? `<a class="btn sm" href="${a.href}">${esc(a.label)}</a>` : `<button class="btn sm ${j === 0 ? 'primary' : ''}" data-sga="${i}:${j}">${esc(a.label)}</button>`).join('')}
-            <button class="btn ghost sm" data-sgx="${i}" title="Ignorer pendant 7 jours">Ignorer</button>
+            ${s.actions.slice(0, 1).map((a) => a.href ? `<a class="btn sm" href="${a.href}">${esc(a.label)}</a>` : `<button class="btn sm primary" data-sga="${i}:0">${esc(a.label)}</button>`).join('')}
+            ${s.actions.length > 1 ? `<select class="sm" data-sgsel="${i}" aria-label="Autres choix"><option value="">…</option>${s.actions.slice(1).map((a, j) => `<option value="${j + 1}">${esc(a.label)}</option>`).join('')}</select>` : ''}
+            <button class="icon-btn xs" data-sgx="${i}" title="Masquer 7 jours" aria-label="Masquer">${icon('close', 14)}</button>
           </div>
-        </li>`).join('')}</ul>` : ''}
+        </li>`;
+      }).join('')}</ul>` : ''}
     </section>`;
 }
 
@@ -113,15 +122,15 @@ export function renderList(el) {
       <form class="card quick" data-quick autocomplete="off">
         <div class="quick-line">
           <input type="text" name="title" placeholder="Nouvelle tâche…" aria-label="Nouvelle tâche" enterkeyhint="done">
-          <button class="btn primary" type="submit">${icon('plus', 18)}<span class="hide-sm">Ajouter</span></button>
+          <button type="button" class="icon-btn" data-details title="Fiche complète">${icon('settings', 20)}</button>
+          <button class="btn primary" type="submit" aria-label="Ajouter">${icon('plus', 18)}<span class="hide-sm">Ajouter</span></button>
         </div>
         <div class="quick-crit">
-          <div><span class="lab">Urgence</span>${seg('urgency', levelOptions(true), Q.urgency, 'lv sm')}</div>
-          <div><span class="lab">Importance</span>${seg('importance', levelOptions(true), Q.importance, 'lv sm')}</div>
-          <div><span class="lab">Énergie</span>${seg('energy', energyOptions(true), Q.energy, 'en sm')}</div>
-          <button type="button" class="btn ghost sm" data-details>Plus de détails…</button>
+          ${slider('urgency', { label: 'Urgence', ...LV, value: Q.urgency, kind: 'heat', compact: true })}
+          ${slider('importance', { label: 'Importance', ...LV, value: Q.importance, kind: 'heat', compact: true })}
+          ${slider('energy', { label: 'Énergie', ...EN, value: Q.energy, kind: 'energy', compact: true })}
+          ${info('criteres')}
         </div>
-        <p class="hint" data-quick-hint>${quickHint()}</p>
       </form>
 
       ${suggestionsHtml(an)}
@@ -134,6 +143,14 @@ export function renderList(el) {
           <option value="done" ${F.status === 'done' ? 'selected' : ''}>Faites</option>
           <option value="all" ${F.status === 'all' ? 'selected' : ''}>Toutes</option>
         </select>
+        <button class="icon-btn filt ${F.more ? 'on' : ''}" data-more title="Filtres et tri" aria-expanded="${F.more}">${icon('filter', 18)}${activeFilters() ? `<i class="dotn">${activeFilters()}</i>` : ''}</button>
+        <div class="seg sm mode" role="group" aria-label="Affichage">
+          <button class="seg-opt ${F.mode === 'list' ? 'on' : ''}" data-mode="list" title="Liste">${icon('list', 16)}</button>
+          <button class="seg-opt ${F.mode === 'matrix' ? 'on' : ''}" data-mode="matrix" title="Matrice urgence / importance">${icon('grid', 16)}</button>
+        </div>
+        ${F.mode === 'matrix' ? info('matrice') : ''}
+      </div>
+      ${F.more ? `<div class="toolbar more">
         <select data-filter="project" aria-label="Projet">
           <option value="">Tous les projets</option><option value="_none" ${F.project === '_none' ? 'selected' : ''}>Sans projet</option>
           ${projects().map((p) => `<option value="${p.id}" ${F.project === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
@@ -148,14 +165,10 @@ export function renderList(el) {
           <option value="score" ${F.sort === 'score' ? 'selected' : ''}>Tri : priorité</option>
           <option value="due" ${F.sort === 'due' ? 'selected' : ''}>Tri : échéance</option>
           <option value="start" ${F.sort === 'start' ? 'selected' : ''}>Tri : date prévue</option>
-          <option value="energy" ${F.sort === 'energy' ? 'selected' : ''}>Tri : énergie (plombantes d’abord)</option>
+          <option value="energy" ${F.sort === 'energy' ? 'selected' : ''}>Tri : plombantes d’abord</option>
           <option value="created" ${F.sort === 'created' ? 'selected' : ''}>Tri : plus récentes</option>
         </select>
-        <div class="seg sm mode" role="group" aria-label="Affichage">
-          <button class="seg-opt ${F.mode === 'list' ? 'on' : ''}" data-mode="list" title="Liste">${icon('list', 16)}</button>
-          <button class="seg-opt ${F.mode === 'matrix' ? 'on' : ''}" data-mode="matrix" title="Matrice urgence / importance">${icon('grid', 16)}</button>
-        </div>
-      </div>
+      </div>` : ''}
 
       ${list.length === 0 ? emptyHtml(all.length) : F.mode === 'matrix' ? matrixHtml(list, an) : `<ul class="tasks">${list.map((t) => row(t, an)).join('')}</ul>`}
     </section>`;
@@ -163,22 +176,15 @@ export function renderList(el) {
   bind(root, el);
 }
 
-function quickHint() {
-  const e = ENERGY[Q.energy];
-  return `Énergie : <b>${esc(e.label)}</b> — ${esc(e.hint)}.`;
-}
-
 function emptyHtml(total) {
   return total
-    ? `<div class="empty"><p>Aucune tâche ne correspond à ces filtres.</p></div>`
-    : `<div class="empty"><h3>Bienvenue dans Gestion des plannings</h3>
-        <p>Saisissez une tâche ci-dessus et notez son <b>urgence</b> (1 à 5), son <b>importance</b> (1 à 5) et l’<b>énergie</b> qu’elle demande (1 plombant à 4 dynamisant).</p>
-        <p>L’application la classe par priorité, vous propose de placer les tâches plombantes le matin ou de les déléguer, et vous la retrouvez dans le calendrier et le Gantt.</p></div>`;
+    ? `<div class="empty"><p>Aucune tâche pour ces filtres.</p></div>`
+    : `<div class="empty"><h3>Aucune tâche</h3><p>Saisissez-en une ci-dessus ${info('criteres')}</p></div>`;
 }
 
 function bind(root, el) {
   const form = root.querySelector('[data-quick]');
-  bindSeg(form, (name, v) => { Q[name] = Number(v); persist(); if (name === 'energy') form.querySelector('[data-quick-hint]').innerHTML = quickHint(); });
+  bindSliders(form, (name, v) => { Q[name] = Number(v); persist(); });
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const title = form.title.value.trim();
@@ -195,6 +201,10 @@ function bind(root, el) {
     openTaskEditor({ title, urgency: Q.urgency, importance: Q.importance, energy: Q.energy, projectId: F.project && F.project !== '_none' ? F.project : null });
   };
 
+  root.querySelectorAll('[data-sgsel]').forEach((sel) => sel.addEventListener('change', () => {
+    const s = lastSuggestions[Number(sel.dataset.sgsel)]; const a = s?.actions[Number(sel.value)];
+    if (a?.run) { a.run(); toast('C’est noté.'); }
+  }));
   root.querySelectorAll('[data-filter]').forEach((inp) => {
     inp.addEventListener(inp.type === 'search' ? 'input' : 'change', () => {
       F[inp.dataset.filter] = inp.value; persist();
@@ -206,6 +216,7 @@ function bind(root, el) {
   root.addEventListener('click', (e) => {
     const m = e.target.closest('[data-mode]');
     if (m) { F.mode = m.dataset.mode; persist(); renderList(el); return; }
+    if (e.target.closest('[data-more]')) { F.more = !F.more; persist(); renderList(el); return; }
     if (e.target.closest('[data-toggle-sugg]')) { F.sugg = !F.sugg; persist(); renderList(el); return; }
     const sga = e.target.closest('[data-sga]');
     if (sga) {

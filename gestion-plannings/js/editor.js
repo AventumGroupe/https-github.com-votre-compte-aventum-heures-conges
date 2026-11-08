@@ -5,11 +5,11 @@ import {
   newResource, putResource, STATUS, ENERGY, RES_TYPES,
 } from './store.js';
 import { tStart, tEnd, setSpan, shiftTo, requiredStart, propagate, succsOf, completeTask, proposeSlot, RECUR } from './sched.js';
-import { openDialog, confirmDialog, toast, seg, bindSeg, levelOptions, energyOptions } from './ui.js';
+import { openDialog, confirmDialog, toast, slider, bindSliders, info, LV, EN } from './ui.js';
 import { esc, icon, uid, parse, toLocal, toDateStr, addMinutes, fmt, cap, fmtDuration, MIN } from './util.js';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 480];
-const REMINDERS = [[null, 'Aucun rappel'], [0, 'À l’heure prévue'], [5, '5 min avant'], [10, '10 min avant'], [15, '15 min avant'], [30, '30 min avant'], [60, '1 h avant'], [120, '2 h avant'], [1440, 'La veille']];
+const REMINDERS = [[null, 'Aucun'], [0, 'À l’heure'], [5, '5 min avant'], [15, '15 min avant'], [30, '30 min avant'], [60, '1 h avant'], [120, '2 h avant'], [1440, 'La veille']];
 const WEEKDAYS = [[1, 'L'], [2, 'M'], [3, 'M'], [4, 'J'], [5, 'V'], [6, 'S'], [0, 'D']];
 
 function successorMap() {
@@ -58,20 +58,19 @@ export function openTaskEditor(idOrPreset = null) {
     const sVal = d.start ? (d.allDay ? d.start.slice(0, 10) : d.start) : '';
     const eVal = d.end ? (d.allDay ? d.end.slice(0, 10) : d.end) : '';
     const type = d.allDay ? 'date' : 'datetime-local';
+    const durs = DURATIONS.includes(d.estimate) ? DURATIONS : [...DURATIONS, d.estimate].sort((a, b) => a - b);
     return `
       <div class="row wrap gap">
-        <label class="switch"><input type="checkbox" data-f="allDay" ${d.allDay ? 'checked' : ''}><span></span> Sur une ou plusieurs journées</label>
-        <button type="button" class="btn ghost sm" data-act="propose">${icon('bulb', 16)} Proposer un créneau</button>
-        ${d.start ? `<button type="button" class="btn ghost sm" data-act="unplan">Retirer du planning</button>` : ''}
+        <label class="switch sm"><input type="checkbox" data-f="allDay" ${d.allDay ? 'checked' : ''}><span></span> Journées</label>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost sm" data-act="propose" title="Proposer un créneau libre">${icon('bulb', 16)} Proposer</button>
+        ${d.start ? `<button type="button" class="icon-btn xs" data-act="unplan" title="Retirer du planning" aria-label="Retirer du planning">${icon('close', 14)}</button>` : ''}
       </div>
       <div class="grid2">
         <label class="field"><span>Début</span><input type="${type}" data-f="start" value="${esc(sVal)}"></label>
         <label class="field"><span>Fin</span><input type="${type}" data-f="end" value="${esc(eVal)}"></label>
-        <label class="field"><span>Durée estimée</span>
-          <select data-f="estimate">${DURATIONS.map((m) => `<option value="${m}" ${d.estimate === m ? 'selected' : ''}>${fmtDuration(m)}</option>`).join('')}
-          ${DURATIONS.includes(d.estimate) ? '' : `<option value="${d.estimate}" selected>${fmtDuration(d.estimate)}</option>`}</select></label>
-        <label class="field"><span>Échéance</span><input type="date" data-f="due" value="${esc(d.due || '')}"></label>
-      </div>`;
+      </div>
+      ${slider('estimate', { label: 'Durée estimée', values: durs, labels: durs.map(fmtDuration), value: d.estimate, ticks: false })}`;
   }
 
   function depsHtml() {
@@ -82,7 +81,7 @@ export function openTaskEditor(idOrPreset = null) {
     return `
       <div class="deps">
         <div>
-          <h4>Prédécesseurs <small>(doivent être finis avant)</small></h4>
+          <h4>Prédécesseurs</h4>
           <ul class="pill-list">${d.preds.map((p) => `
             <li class="pill">${esc(taskTitle(p.id))}
               <label class="lag" title="Délai après la fin, en jours">+<input type="number" min="0" max="365" value="${p.lag || 0}" data-lag="${p.id}"> j</label>
@@ -91,7 +90,7 @@ export function openTaskEditor(idOrPreset = null) {
           ${predOpts.length ? `<select data-addpred><option value="">＋ Ajouter un prédécesseur…</option>${predOpts.map(optTask).join('')}</select>` : ''}
         </div>
         <div>
-          <h4>Successeurs <small>(commencent après)</small></h4>
+          <h4>Successeurs</h4>
           <ul class="pill-list">${succIds.map((id) => `
             <li class="pill">${esc(taskTitle(id))}<button type="button" class="x" data-rmsucc="${id}" aria-label="Retirer">${icon('close', 14)}</button></li>`).join('') || '<li class="muted">Aucun</li>'}
           </ul>
@@ -128,49 +127,63 @@ export function openTaskEditor(idOrPreset = null) {
           <input type="text" value="${esc(s.title)}" data-subtitle="${s.id}" aria-label="Sous-tâche">
           <button type="button" class="x" data-rmsub="${s.id}" aria-label="Supprimer">${icon('close', 14)}</button></li>`).join('')}
       </ul>
-      <div class="row gap"><input type="text" data-newsub placeholder="Ajouter une sous-tâche puis Entrée"><button type="button" class="btn ghost sm" data-act="addsub">${icon('plus', 16)}</button></div>`;
+      <div class="row gap"><input type="text" data-newsub placeholder="Nouvelle sous-tâche"><button type="button" class="btn ghost sm" data-act="addsub">${icon('plus', 16)}</button></div>`;
   }
 
   function recurHtml() {
     const r = d.recur || {};
+    const freqs = ['', ...Object.keys(RECUR)];
+    const flabels = ['Aucune', 'Chaque jour', 'Chaque semaine', 'Chaque mois', 'Chaque année'];
+    const unit = { daily: 'jour', weekly: 'semaine', monthly: 'mois', yearly: 'an' }[r.freq] || '';
+    const ivs = Array.from({ length: 12 }, (_, i) => i + 1);
     return `
-      <div class="grid2">
-        <label class="field"><span>Répétition</span>
-          <select data-recur="freq"><option value="">Aucune</option>${Object.entries(RECUR).map(([k, v]) => `<option value="${k}" ${r.freq === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-        ${r.freq ? `<label class="field"><span>Tous les</span><input type="number" min="1" max="99" value="${r.interval || 1}" data-recur="interval"></label>` : ''}
-      </div>
+      ${slider('recurFreq', { label: 'Répétition', values: freqs, labels: flabels, value: r.freq || '', ticks: false })}
+      ${r.freq ? slider('recurInterval', { label: 'Tous les', values: ivs, labels: ivs.map((n) => `${n} ${unit}${n > 1 && unit !== 'mois' ? 's' : ''}`), value: r.interval || 1, ticks: false }) : ''}
       ${r.freq === 'weekly' ? `<div class="weekdays">${WEEKDAYS.map(([v, l]) => `<button type="button" class="wd${(r.days || []).includes(v) ? ' on' : ''}" data-wd="${v}">${l}</button>`).join('')}</div>` : ''}
-      ${r.freq ? `<label class="field"><span>Jusqu’au (facultatif)</span><input type="date" value="${esc(r.until || '')}" data-recur="until"></label>
-        <p class="hint">${icon('repeat', 14)} Quand vous cochez la tâche comme faite, la suivante est créée automatiquement.</p>` : ''}`;
+      ${r.freq ? `<label class="field"><span>Jusqu’au</span><input type="date" value="${esc(r.until || '')}" data-recur="until"></label>` : ''}`;
   }
 
   function bodyHtml() {
+    const remIdx = REMINDERS.map((r) => r[0]);
+    const st = Object.keys(STATUS);
+    const nSub = d.subtasks.length, nDep = d.preds.length + succIds.length, nRes = d.assign.length;
+    const sec = (key, ico, title, count, inner, infoKey, open) => `
+      <details class="block" ${open ? 'open' : ''}>
+        <summary>${icon(ico, 18)} <span>${title}</span>${count ? `<span class="count">${count}</span>` : ''}${infoKey ? info(infoKey) : ''}<span class="caret">${icon('chevR', 14)}</span></summary>
+        <div data-part="${key}">${inner}</div>
+      </details>`;
     return `
-      <label class="field big"><span>Tâche</span><input type="text" data-f="title" value="${esc(d.title)}" placeholder="Que faut-il faire ?" required autocomplete="off"></label>
+      <label class="field big"><input type="text" data-f="title" value="${esc(d.title)}" placeholder="Que faut-il faire ?" required autocomplete="off" aria-label="Tâche"></label>
       <div class="crit">
-        <div><h4>Urgence</h4>${seg('urgency', levelOptions(), d.urgency, 'lv')}</div>
-        <div><h4>Importance</h4>${seg('importance', levelOptions(), d.importance, 'lv')}</div>
-        <div><h4>Énergie demandée</h4>${seg('energy', energyOptions(), d.energy, 'en')}<p class="hint" data-energy-hint>${esc(ENERGY[d.energy].hint)}</p></div>
+        ${slider('urgency', { label: 'Urgence', ...LV, value: d.urgency, kind: 'heat' })}
+        ${slider('importance', { label: 'Importance', ...LV, value: d.importance, kind: 'heat' })}
+        ${slider('energy', { label: 'Énergie', ...EN, value: d.energy, kind: 'energy', infoKey: 'energie' })}
+        ${slider('status', { label: 'Statut', values: st, labels: st.map((k) => STATUS[k]), value: d.status, ticks: 'labels', kind: 'status' })}
       </div>
       <div class="grid2">
-        <div class="field"><span>Statut</span>${seg('status', Object.entries(STATUS).map(([v, label]) => ({ v, label })), d.status)}</div>
         <label class="field"><span>Projet</span>
           <select data-f="projectId"><option value="">Sans projet</option>${projects().map((p) => `<option value="${p.id}" ${d.projectId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
           <option value="__new">＋ Nouveau projet…</option></select></label>
+        <label class="field"><span>Échéance</span><input type="date" data-f="due" value="${esc(d.due || '')}"></label>
       </div>
-      <section class="block"><h3>${icon('calendar', 18)} Planification</h3><div data-part="planning">${planningHtml()}</div>
-        <div class="grid2">
-          <label class="field"><span>${icon('bell', 15)} Rappel</span><select data-f="reminder">${REMINDERS.map(([v, l]) => `<option value="${v ?? ''}" ${d.reminder === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-          <label class="field"><span>${icon('user', 15)} Déléguée à</span><select data-f="delegate"><option value="">Moi</option>${people().map((p) => `<option value="${p.id}" ${d.delegate === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
-        </div>
-      </section>
-      <section class="block"><h3>${icon('link', 18)} Dépendances</h3><div data-part="deps">${depsHtml()}</div></section>
-      <section class="block"><h3>${icon('people', 18)} Ressources</h3><div data-part="res">${resHtml()}</div></section>
-      <section class="block"><h3>${icon('check', 18)} Sous-tâches</h3><div data-part="sub">${subHtml()}</div></section>
-      <section class="block"><h3>${icon('repeat', 18)} Récurrence</h3><div data-part="recur">${recurHtml()}</div></section>
-      <label class="field"><span>Notes</span><textarea data-f="notes" rows="3" placeholder="Détails, liens, contexte…">${esc(d.notes)}</textarea></label>
-      ${existing?.slips ? `<p class="hint warn">${icon('alert', 14)} Reportée automatiquement ${existing.slips} fois.</p>` : ''}
-      ${existing?.outlook?.id ? `<p class="hint">${icon('sync', 14)} Synchronisée avec Outlook.</p>` : ''}`;
+      ${sec('planning', 'calendar', 'Planification', d.start ? 1 : 0, planningHtml(), 'planif', true)}
+      <details class="block" ${d.delegate || d.reminder != null ? '' : ''}>
+        <summary>${icon('bell', 18)} <span>Rappel et délégation</span><span class="caret">${icon('chevR', 14)}</span></summary>
+        ${slider('reminder', { label: 'Rappel', values: remIdx, labels: REMINDERS.map((r) => r[1]), value: d.reminder, ticks: false })}
+        <label class="field"><span>Déléguée à</span><select data-f="delegate"><option value="">Moi</option>${people().map((p) => `<option value="${p.id}" ${d.delegate === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+      </details>
+      ${sec('deps', 'link', 'Dépendances', nDep, depsHtml(), 'dependances', nDep > 0)}
+      ${sec('res', 'people', 'Ressources', nRes, resHtml(), 'ressources', nRes > 0)}
+      ${sec('sub', 'check', 'Sous-tâches', nSub, subHtml(), '', nSub > 0)}
+      ${sec('recur', 'repeat', 'Récurrence', d.recur ? 1 : 0, recurHtml(), 'recurrence', !!d.recur)}
+      <details class="block" ${d.notes ? 'open' : ''}>
+        <summary>${icon('pdf', 18)} <span>Notes</span><span class="caret">${icon('chevR', 14)}</span></summary>
+        <textarea data-f="notes" rows="3" aria-label="Notes">${esc(d.notes)}</textarea>
+      </details>
+      <div class="row wrap gap-sm foot-badges">
+        ${existing?.slips ? `<span class="badge warn">${icon('alert', 13)} Reportée ×${existing.slips}</span>` : ''}
+        ${existing?.outlook?.id ? `<span class="badge muted">${icon('sync', 13)} Outlook</span>` : ''}
+      </div>`;
   }
 
   const footer = `
@@ -197,10 +210,20 @@ export function openTaskEditor(idOrPreset = null) {
     }
   }
 
-  bindSeg(body, (name, v) => {
-    if (name === 'status') d.status = v;
-    else d[name] = Number(v);
-    if (name === 'energy') body.querySelector('[data-energy-hint]').textContent = ENERGY[d.energy].hint;
+  bindSliders(body, (name, v, final) => {
+    if (name === 'urgency' || name === 'importance' || name === 'energy') d[name] = Number(v);
+    else if (name === 'status') d.status = v;
+    else if (name === 'reminder') d.reminder = v;
+    else if (name === 'estimate') {
+      d.estimate = Number(v);
+      if (d.start && !d.allDay) {
+        d.end = toLocal(addMinutes(parse(d.start), d.estimate));
+        const e = body.querySelector('[data-f="end"]'); if (e) e.value = d.end;
+      }
+    } else if (name === 'recurFreq') {
+      d.recur = v ? { ...(d.recur || {}), freq: v, interval: d.recur?.interval || 1, days: d.recur?.days || [] } : null;
+      if (final || !v || !body.querySelector('[data-sld="recurInterval"]')) part('recur', recurHtml());
+    } else if (name === 'recurInterval' && d.recur) d.recur.interval = Number(v);
   });
 
   body.addEventListener('input', (e) => {
@@ -241,12 +264,7 @@ export function openTaskEditor(idOrPreset = null) {
       if (d.start && d.end < d.start) d.end = d.start;
       if (!d.allDay && d.start) d.estimate = Math.max(15, Math.round((parse(d.end) - parse(d.start)) / MIN));
       part('planning', planningHtml());
-    } else if (f === 'estimate') {
-      d.estimate = Number(t.value);
-      if (d.start && !d.allDay) d.end = toLocal(addMinutes(parse(d.start), d.estimate));
-      part('planning', planningHtml());
     } else if (f === 'due') d.due = t.value || null;
-    else if (f === 'reminder') d.reminder = t.value === '' ? null : Number(t.value);
     else if (f === 'delegate') d.delegate = t.value || null;
     else if (f === 'projectId') {
       if (t.value === '__new') {
@@ -271,8 +289,7 @@ export function openTaskEditor(idOrPreset = null) {
       part('sub', subHtml());
     } else if (t.dataset.recur) {
       const k = t.dataset.recur;
-      if (k === 'freq') d.recur = t.value ? { ...(d.recur || {}), freq: t.value, interval: d.recur?.interval || 1, days: d.recur?.days || [] } : null;
-      else if (d.recur) d.recur[k] = k === 'interval' ? Math.max(1, Number(t.value) || 1) : t.value || null;
+      if (d.recur) d.recur[k] = t.value || null;
       part('recur', recurHtml());
     }
   });

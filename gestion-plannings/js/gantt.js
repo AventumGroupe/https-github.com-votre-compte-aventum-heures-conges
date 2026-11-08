@@ -6,7 +6,7 @@ import { tStart, tEnd, setSpan, shiftTo, propagate, requiredStart, analyze, woul
 import { openTaskEditor } from './editor.js';
 import { openProjectEditor } from './resources.js';
 import { enableDrag, makeGhost, dropTarget, autoScroll } from './drag.js';
-import { toast } from './ui.js';
+import { toast, slider, bindSliders, info } from './ui.js';
 import { esc, icon, parse, toDateStr, addDays, startOfDay, startOfWeek, sameDay, daysBetween, fmt, cap, isMobile, isoWeek, DAY, MIN } from './util.js';
 
 const ROW = 34;
@@ -260,25 +260,18 @@ export function renderGantt(el) {
           ${projects().map((p) => `<option value="${p.id}" ${G.project === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
           <option value="_none" ${G.project === '_none' ? 'selected' : ''}>Sans projet</option>
         </select>
-        ${mobile ? `<div class="seg sm" role="group">
-            <button class="seg-opt ${compact ? 'on' : ''}" data-mm="compact">Compact</button>
-            <button class="seg-opt ${!compact ? 'on' : ''}" data-mm="full">Gantt</button></div>` : ''}
-        ${compact ? '' : `<div class="seg sm" role="group">${Object.entries(ZOOMS).map(([k, z]) => `<button class="seg-opt ${G.zoom === k ? 'on' : ''}" data-zoom="${k}">${z.label}</button>`).join('')}</div>`}
-        <label class="switch sm"><input type="checkbox" data-g="critical" ${G.critical ? 'checked' : ''}><span></span> Chemin critique</label>
-        <label class="switch sm"><input type="checkbox" data-g="showDone" ${G.showDone ? 'checked' : ''}><span></span> Terminées</label>
+        ${mobile ? `<label class="switch sm"><input type="checkbox" data-full ${!compact ? 'checked' : ''}><span></span> Gantt complet</label>` : ''}
+        ${compact ? '' : slider('zoom', { values: Object.keys(ZOOMS), labels: Object.values(ZOOMS).map((z) => z.label), value: G.zoom, ticks: 'labels', compact: true })}
+        <label class="switch sm" title="Chemin critique"><input type="checkbox" data-g="critical" ${G.critical ? 'checked' : ''}><span></span> Critique</label>
+        <label class="switch sm"><input type="checkbox" data-g="showDone" ${G.showDone ? 'checked' : ''}><span></span> Faites</label>
+        ${info('gantt')}
         <span class="spacer"></span>
-        ${lateCount ? `<span class="badge danger">${icon('alert', 13)} ${lateCount} tâche${lateCount > 1 ? 's' : ''} critique${lateCount > 1 ? 's' : ''}</span>` : ''}
-        ${compact ? '' : `<button class="btn ghost sm" data-today>Aujourd’hui</button>`}
-        <button class="btn ghost sm" data-newproj>${icon('plus', 16)}<span class="hide-sm">Projet</span></button>
-        <button class="btn sm" data-pdf>${icon('pdf', 16)}<span class="hide-sm">Export PDF</span></button>
+        ${lateCount ? `<span class="badge danger" title="Tâches qui finiront après leur échéance">${icon('alert', 13)} ${lateCount}</span>` : ''}
+        ${compact ? '' : `<button class="icon-btn" data-today title="Aujourd’hui" aria-label="Aujourd’hui">${icon('calendar', 18)}</button>`}
+        <button class="icon-btn" data-newproj title="Nouveau projet" aria-label="Nouveau projet">${icon('plus', 18)}</button>
+        <button class="icon-btn" data-pdf title="Export PDF" aria-label="Export PDF">${icon('pdf', 18)}</button>
       </div>
-      <div class="g-legend">
-        <span><i class="lg late"></i>Critique : finira après l’échéance</span>
-        ${G.critical ? '<span><i class="lg critical"></i>Chemin critique (aucune marge)</span>' : ''}
-        <span><i class="lg dl"></i>Échéance projet</span>
-        ${compact ? '' : '<span class="muted">Glissez une barre pour la déplacer, son bord droit pour la durée, le rond pour créer un lien.</span>'}
-      </div>
-      ${empty ? `<div class="empty"><h3>Aucun projet planifié</h3><p>Créez un projet, rattachez-y des tâches (dans leur fiche) et donnez-leur des dates. Les liens prédécesseur / successeur apparaîtront sous forme de flèches.</p>
+      ${empty ? `<div class="empty"><h3>Aucun projet planifié</h3>
         <button class="btn primary" data-newproj>${icon('plus', 16)} Créer un projet</button></div>`
         : compact ? `<div class="cg-wrap">${compactHtml(gs, an)}</div>`
         : `<div class="gantt-scroll">${ganttHtml(rows, an, from, to, { dayW, nameW })}</div>`}
@@ -296,7 +289,9 @@ export function renderGantt(el) {
 
 function bind(el, { from, dayW }) {
   const root = el.querySelector('.gantt-view');
+  bindSliders(root, (name, v) => { if (name === 'zoom' && v !== G.zoom) { G.zoom = v; persist(); renderGantt(el); } });
   root.addEventListener('change', (e) => {
+    if (e.target.matches('[data-full]')) { G.mobileMode = e.target.checked ? 'full' : 'compact'; persist(); renderGantt(el); return; }
     const k = e.target.dataset.g;
     if (!k) return;
     G[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;

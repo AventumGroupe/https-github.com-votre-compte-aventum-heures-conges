@@ -4,7 +4,7 @@ import { db, tasks, putTask, save, local, outlookEvents, score, ENERGY } from '.
 import { tStart, tEnd, setSpan, propagate, requiredStart, findFreeSlot, analyze } from './sched.js';
 import { openTaskEditor } from './editor.js';
 import { enableDrag, makeGhost, dropTarget, autoScroll } from './drag.js';
-import { toast, energyChip, levelChip } from './ui.js';
+import { toast, energyChip, levelChip, slider, bindSliders, info } from './ui.js';
 import {
   esc, icon, parse, toLocal, toDateStr, addDays, addMinutes, startOfDay, startOfWeek, startOfMonth,
   sameDay, daysBetween, fmt, cap, isMobile, MIN, isoWeek,
@@ -103,10 +103,9 @@ export function renderCalendar(el) {
           <button class="icon-btn" data-nav="1" aria-label="Suivant">${icon('chevR')}</button>
         </div>
         <h2 class="cal-title">${esc(titleOf())}</h2>
-        <div class="seg sm" role="group">
-          ${['day', 'week', 'month'].map((v) => `<button class="seg-opt ${state.view === v ? 'on' : ''}" data-view="${v}">${{ day: 'Jour', week: 'Semaine', month: 'Mois' }[v]}</button>`).join('')}
-        </div>
-        <button class="btn ghost sm" data-sync title="${connected ? 'Synchroniser avec Outlook' : 'Connecter Outlook dans les réglages'}">${icon('sync', 16)}<span class="hide-sm">${connected ? 'Outlook' : 'Connecter Outlook'}</span></button>
+        ${slider('calview', { values: ['day', 'week', 'month'], labels: ['Jour', 'Semaine', 'Mois'], value: state.view, ticks: 'labels', compact: true })}
+        ${info('calendrier')}
+        <button class="icon-btn sync-btn ${connected ? 'on' : ''}" data-sync title="${connected ? 'Synchroniser avec Outlook' : 'Connecter Outlook (réglages)'}" aria-label="Outlook">${icon('sync', 18)}</button>
       </div>
       <div class="cal-body">
         <aside class="tray" aria-label="Tâches à planifier">
@@ -114,7 +113,6 @@ export function renderCalendar(el) {
             <b>À planifier</b><span class="count">${unplanned.length}</span><span class="spacer"></span>
             <span class="muted sm show-sm">${state.tray ? 'Fermer' : 'Ouvrir'}</span>
           </button>
-          <p class="hint">${isMobile() ? 'Appui long puis glissez' : 'Glissez'} une tâche sur le calendrier. Les créneaux du matin sont teintés : idéal pour les tâches plombantes.</p>
           <ul class="tray-list">${unplanned.map((t) => `
             <li class="tray-item e${t.energy}" data-drag-task="${t.id}" data-open-task="${t.id}">
               <span class="grip">${icon('grip', 14)}</span>
@@ -232,6 +230,7 @@ function monthHtml(an) {
 // ---------- Interactions ----------
 function bind(el) {
   const root = el.querySelector('.cal-view');
+  bindSliders(root, (name, v, final) => { if (name === 'calview' && v !== state.view) { go(v, state.date); renderCalendar(el); } });
   root.addEventListener('click', (e) => {
     const nav = e.target.closest('[data-nav]');
     if (nav) {

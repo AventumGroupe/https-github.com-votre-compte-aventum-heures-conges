@@ -1,5 +1,7 @@
 # Gestion des plannings
 
+> **Ce dossier n'est plus maintenu ici.** Le code, la version web et l'APK sont désormais dans le dépôt **[AventumGroupe/plannings](https://github.com/AventumGroupe/plannings)** — APK : https://github.com/AventumGroupe/plannings/releases/latest/download/gestion-plannings.apk
+
 Application web installable sur Android (PWA) pour planifier ses tâches selon trois critères :
 
 | Critère | Échelle |
